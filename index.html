@@ -178,6 +178,9 @@
             // Buscar imagens do banco
             const imagens = await buscarImagensNovidades();
             
+            // Buscar serviços do Firebase
+            const servicos = await buscarServicos();
+            
             // Carrossel de Novidades
             let carrosselHtml = '';
             if (imagens.length === 0) {
@@ -199,7 +202,7 @@
                         <div class="carousel-inner rounded-4 shadow">
                             ${imagens.map((img, idx) => `
                                 <div class="carousel-item ${idx === 0 ? 'active' : ''}">
-                                    <img src="${img.imagem_url}" class="d-block w-100 carousel-img" alt="${img.titulo}" style="height: 400px; object-fit: cover;">
+                                    <img src="${img.imagem_url}" class="d-block w-100 carousel-img" alt="${img.titulo}">
                                     <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded-3 p-3">
                                         <h5>${img.titulo}</h5>
                                         <p>${img.descricao || ''}</p>
@@ -217,13 +220,35 @@
                 `;
             }
             
-            // Serviços Fixos
-            const servicos = [
-                { id: 'agendamentos', titulo: 'Agendamentos', descricao: 'Agende seus horários de forma fácil e rápida', icone: 'fa-calendar-alt', cor: 'primary' },
-                { id: 'palestras', titulo: 'Palestras', descricao: 'Participe das nossas palestras online', icone: 'fa-chalkboard-user', cor: 'success' },
-                { id: 'cursos', titulo: 'Cursos', descricao: 'Acesse cursos exclusivos', icone: 'fa-graduation-cap', cor: 'info' },
-                { id: 'junte-se', titulo: 'Junte-se ao Instituto', descricao: 'Faça parte do nosso time', icone: 'fa-users', cor: 'warning' }
-            ];
+            // Serviços vindos do Firebase
+            let servicosHtml = '';
+            if (servicos.length === 0) {
+                servicosHtml = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Nenhum serviço cadastrado no momento.
+                    </div>
+                `;
+            } else {
+                servicosHtml = `
+                    <div class="row g-4">
+                        ${servicos.map(servico => `
+                            <div class="col-md-6 col-lg-3">
+                                <div class="card h-100 text-center shadow-sm hover-card">
+                                    <div class="card-body">
+                                        <div class="rounded-circle bg-${servico.cor} bg-opacity-10 p-3 d-inline-block mb-3">
+                                            <i class="fas ${servico.icone} fa-3x text-${servico.cor}"></i>
+                                        </div>
+                                        <h5 class="card-title">${servico.titulo}</h5>
+                                        <p class="card-text text-muted">${servico.descricao}</p>
+                                        ${servico.link !== '#' ? `<a href="${servico.link}" class="btn btn-sm btn-outline-${servico.cor} mt-2">Saiba mais</a>` : '<small class="text-muted">Em breve mais informações</small>'}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
             
             contentArea.innerHTML = `
                 <div class="container py-4">
@@ -243,22 +268,7 @@
                                 <i class="fas fa-cogs text-primary me-2"></i>
                                 Nossos Serviços
                             </h2>
-                            <div class="row g-4">
-                                ${servicos.map(servico => `
-                                    <div class="col-md-6 col-lg-3">
-                                        <div class="card h-100 text-center shadow-sm hover-card">
-                                            <div class="card-body">
-                                                <div class="rounded-circle bg-${servico.cor} bg-opacity-10 p-3 d-inline-block mb-3">
-                                                    <i class="fas ${servico.icone} fa-3x text-${servico.cor}"></i>
-                                                </div>
-                                                <h5 class="card-title">${servico.titulo}</h5>
-                                                <p class="card-text text-muted">${servico.descricao}</p>
-                                                <small class="text-muted">Em breve mais informações</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
+                            ${servicosHtml}
                         </div>
                     </div>
                 </div>
