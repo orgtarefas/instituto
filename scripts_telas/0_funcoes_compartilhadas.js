@@ -1,4 +1,4 @@
-import { auth, db, doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } from '../0_firebase_api_config.js';
+import { auth, db, doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where, updateDoc } from '../0_firebase_api_config.js';
 
 // ==================== FUNÇÕES DE AUTENTICAÇÃO ====================
 
@@ -22,7 +22,7 @@ export async function getCurrentUser() {
     });
 }
 
-// Verificar permissão para gerenciar imagens
+// Verificar permissão para gerenciar imagens e serviços
 export async function verificarPermissaoAdmin(userData) {
     if (!userData) return false;
     
@@ -38,6 +38,100 @@ export async function verificarPermissaoAdmin(userData) {
     
     return false;
 }
+
+// ==================== FUNÇÕES DE SERVIÇOS ====================
+
+// Buscar serviços ativos
+export async function buscarServicos() {
+    try {
+        const q = query(
+            collection(db, 'servicos'), 
+            where('ativo', '==', true)
+        );
+        const querySnapshot = await getDocs(q);
+        const servicos = [];
+        querySnapshot.forEach((doc) => {
+            servicos.push({ id: doc.id, ...doc.data() });
+        });
+        // Ordenar por ordem em memória
+        servicos.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+        return servicos;
+    } catch (error) {
+        console.error('Erro ao buscar serviços:', error);
+        return [];
+    }
+}
+
+// Buscar todos os serviços (para admin)
+export async function buscarTodosServicos() {
+    try {
+        const querySnapshot = await getDocs(collection(db, 'servicos'));
+        const servicos = [];
+        querySnapshot.forEach((doc) => {
+            servicos.push({ id: doc.id, ...doc.data() });
+        });
+        servicos.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+        return servicos;
+    } catch (error) {
+        console.error('Erro ao buscar serviços:', error);
+        return [];
+    }
+}
+
+// Salvar serviço
+export async function salvarServico(dados) {
+    try {
+        const docRef = await addDoc(collection(db, 'servicos'), {
+            titulo: dados.titulo,
+            descricao: dados.descricao,
+            icone: dados.icone,
+            cor: dados.cor,
+            ordem: dados.ordem || 999,
+            ativo: dados.ativo !== undefined ? dados.ativo : true,
+            link: dados.link || '#',
+            criado_em: new Date().toISOString(),
+            criado_por: dados.criado_por
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Erro ao salvar serviço:', error);
+        throw error;
+    }
+}
+
+// Atualizar serviço
+export async function atualizarServico(id, dados) {
+    try {
+        const servicoRef = doc(db, 'servicos', id);
+        await updateDoc(servicoRef, {
+            titulo: dados.titulo,
+            descricao: dados.descricao,
+            icone: dados.icone,
+            cor: dados.cor,
+            ordem: dados.ordem,
+            ativo: dados.ativo,
+            link: dados.link,
+            atualizado_em: new Date().toISOString()
+        });
+        return true;
+    } catch (error) {
+        console.error('Erro ao atualizar serviço:', error);
+        throw error;
+    }
+}
+
+// Excluir serviço
+export async function excluirServico(id) {
+    try {
+        await deleteDoc(doc(db, 'servicos', id));
+        return true;
+    } catch (error) {
+        console.error('Erro ao excluir serviço:', error);
+        throw error;
+    }
+}
+
+// ==================== FUNÇÕES DE CARROSSEL ====================
 
 // Buscar chave da API do ImgBB
 export async function getImgBBKey() {
@@ -101,7 +195,7 @@ export async function uploadImageToImgBB(file, onProgress) {
     });
 }
 
-// Salvar imagem do carrossel no Firestore (SEM ORDENAÇÃO)
+// Salvar imagem do carrossel no Firestore
 export async function salvarImagemCarrossel(dados) {
     try {
         const docRef = await addDoc(collection(db, 'carrossel_novidades'), {
@@ -120,7 +214,7 @@ export async function salvarImagemCarrossel(dados) {
     }
 }
 
-// Buscar imagens do carrossel de novidades (SEM ORDER BY)
+// Buscar imagens do carrossel de novidades
 export async function buscarImagensNovidades() {
     try {
         const q = query(
@@ -158,14 +252,13 @@ export async function excluirImagemCarrossel(id) {
 
 // ==================== FUNÇÕES DE BACKGROUND ====================
 
-// Aplicar background (caminhos corrigidos)
+// Aplicar background
 export function aplicarBackground(telaId, perfil) {
     const mainContent = document.getElementById('mainContent');
     if (!mainContent) return;
     
     const isCliente = (perfil === 'Cliente' || perfil === 'cliente');
     
-    // Mapeamento de backgrounds com caminhos relativos
     const backgrounds = {
         'home_clientes': './imagens/backgrounds/background_home_clientes.png',
         'home_funcionarios': './imagens/backgrounds/background_home_funcionarios.png',
