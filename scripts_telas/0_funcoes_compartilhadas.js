@@ -202,7 +202,14 @@ export async function verificarSessao() {
     const sessionData = localStorage.getItem('userSession');
     if (sessionData) {
         currentUser = JSON.parse(sessionData);
-        return currentUser;
+        // Verificar se o Firebase Auth ainda está autenticado
+        if (auth.currentUser && auth.currentUser.uid === currentUser.uid) {
+            return currentUser;
+        } else {
+            // Sessão inválida, limpar
+            localStorage.removeItem('userSession');
+            return null;
+        }
     }
     return null;
 }
@@ -257,6 +264,7 @@ export function mostrarNotificacao(mensagem, tipo = 'success') {
     alertDiv.className = `alert alert-${tipo} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
     alertDiv.style.zIndex = '9999';
     alertDiv.style.minWidth = '300px';
+    alertDiv.style.animation = 'slideIn 0.3s ease';
     alertDiv.innerHTML = `
         <i class="fas ${tipo === 'success' ? 'fa-check-circle' : tipo === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle'} me-2"></i>
         ${mensagem}
@@ -266,7 +274,7 @@ export function mostrarNotificacao(mensagem, tipo = 'success') {
     
     setTimeout(() => {
         alertDiv.remove();
-    }, 3000);
+    }, 4000);
 }
 
 // Validar formulário
