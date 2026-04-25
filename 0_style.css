@@ -17,8 +17,9 @@ body {
     min-height: 100vh;
 }
 
-.logo-img {
-    height: 50px;
+/* Logo centralizada e maior */
+.logo-img-center {
+    height: 70px;
     width: auto;
     object-fit: contain;
 }
@@ -110,8 +111,8 @@ header {
 
 /* Responsividade */
 @media (max-width: 768px) {
-    .logo-img {
-        height: 40px;
+    .logo-img-center {
+        height: 45px;
     }
     
     .carousel-img {
@@ -139,6 +140,15 @@ header {
     .btn {
         padding: 6px 12px;
         font-size: 12px;
+    }
+    
+    .rounded-circle {
+        width: 60px !important;
+        height: 60px !important;
+    }
+    
+    .rounded-circle i {
+        font-size: 24px !important;
     }
 }
 
@@ -251,9 +261,17 @@ header {
     justify-content: center;
 }
 
-/* Tracking prevention fix */
-iframe,
-img,
-video {
-    max-width: 100%;
+/* Botões de gerenciamento */
+#btnGerenciarCarrossel,
+#btnGerenciarServicos {
+    font-size: 12px;
+    padding: 5px 10px;
+}
+
+@media (max-width: 768px) {
+    #btnGerenciarCarrossel,
+    #btnGerenciarServicos {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
 }
