@@ -1,26 +1,88 @@
-import { signOut, auth } from '../0_firebase_api_config.js';
+import { auth } from '../0_firebase_api_config.js';
 
-// Variáveis globais
-let menuItems = [];
-let currentUser = null;
-let currentTela = 'home';
+let userDataCache = null;
 
-// Função para definir o background baseado na tela e perfil
+// Função segura para obter usuário atual (sempre verifica no Firebase)
+export async function getCurrentUser() {
+    return new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            unsubscribe();
+            if (user) {
+                resolve(user);
+            } else {
+                resolve(null);
+            }
+        });
+    });
+}
+
+// Verificar se o usuário está autenticado (FORÇA VERIFICAÇÃO NO FIREBASE)
+export async function isAuthenticated() {
+    const user = await getCurrentUser();
+    return user !== null;
+}
+
+// Obter token ID do Firebase (para validações no backend)
+export async function getIdToken() {
+    const user = await getCurrentUser();
+    if (user) {
+        return await user.getIdToken();
+    }
+    return null;
+}
+
+// Verificar permissão específica (sempre verifica no Firebase)
+export async function verificarPermissao(permissaoNecessaria) {
+    try {
+        const user = await getCurrentUser();
+        if (!user) return false;
+        
+        // Buscar dados atualizados do Firestore
+        const { db, doc, getDoc, query, collection, where, getDocs } = await import('../0_firebase_api_config.js');
+        
+        const loginsRef = collection(db, 'logins');
+        const q = query(loginsRef, where('email', '==', user.email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            let userData = null;
+            querySnapshot.forEach((doc) => {
+                userData = doc.data();
+            });
+            
+            // Verificar permissão baseada no perfil/cargo
+            switch(permissaoNecessaria) {
+                case 'admin':
+                    return userData.perfil === 'admin';
+                case 'funcionario':
+                    return userData.cargo !== 'Cliente';
+                case 'cliente':
+                    return userData.cargo === 'Cliente';
+                default:
+                    return true;
+            }
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('Erro ao verificar permissão:', error);
+        return false;
+    }
+}
+
+// Aplicar background
 export function aplicarBackground(telaId, perfil) {
     const mainContent = document.getElementById('mainContent');
     if (!mainContent) return;
     
-    // Mapeamento de backgrounds
     const backgrounds = {
-        // Cliente
         'home_clientes': 'url("../imagens/backgrounds/background_home_clientes.png")',
-        'agendamentos_clientes': 'url("../imagens/backgrounds/background_agendamentos_clientes.png")',
-        'palestras_clientes': 'url("../imagens/backgrounds/background_palestras_clientes.png")',
-        'cursos_clientes': 'url("../imagens/backgrounds/background_cursos_clientes.png")',
-        // Funcionário
         'home_funcionarios': 'url("../imagens/backgrounds/background_home_funcionarios.png")',
+        'agendamentos_clientes': 'url("../imagens/backgrounds/background_agendamentos_clientes.png")',
         'agendamentos_funcionarios': 'url("../imagens/backgrounds/background_agendamentos_funcionarios.png")',
+        'palestras_clientes': 'url("../imagens/backgrounds/background_palestras_clientes.png")',
         'palestras_funcionarios': 'url("../imagens/backgrounds/background_palestras_funcionarios.png")',
+        'cursos_clientes': 'url("../imagens/backgrounds/background_cursos_clientes.png")',
         'cursos_funcionarios': 'url("../imagens/backgrounds/background_cursos_funcionarios.png")',
         'cadastros_funcionarios': 'url("../imagens/backgrounds/background_cadastros_funcionarios.png")'
     };
@@ -64,8 +126,6 @@ export function aplicarBackground(telaId, perfil) {
         mainContent.style.backgroundAttachment = 'fixed';
         mainContent.style.backgroundRepeat = 'no-repeat';
         
-        // Adicionar overlay para melhor legibilidade
-        mainContent.style.position = 'relative';
         const contentWrapper = document.querySelector('.content-wrapper');
         if (contentWrapper) {
             contentWrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
@@ -77,8 +137,9 @@ export function aplicarBackground(telaId, perfil) {
     }
 }
 
-// Função para carregar o menu baseado no cargo
-export function carregarMenu(cargo) {
+// Carregar menu
+export function carregarMenu(cargo, userData) {
+    let menuItems = [];
     const isCliente = (cargo === 'Cliente' || cargo === 'cliente');
     
     if (isCliente) {
@@ -98,7 +159,6 @@ export function carregarMenu(cargo) {
         ];
     }
     
-    // Atualizar o menu dropdown
     const navMenu = document.getElementById('navMenu');
     if (navMenu) {
         navMenu.innerHTML = menuItems.map(item => `
@@ -109,17 +169,22 @@ export function carregarMenu(cargo) {
             </li>
         `).join('');
         
-        // Adicionar event listeners para os itens do menu
         document.querySelectorAll('[data-tela]').forEach(link => {
             link.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const telaId = link.getAttribute('data-tela');
-                currentTela = telaId;
-                await carregarTela(telaId, currentUser);
                 
-                // Fechar o dropdown após clicar (mobile)
-                const dropdownMenu = document.querySelector('.dropdown-menu');
-                if (dropdownMenu && window.innerWidth < 768) {
+                // Verificar autenticação antes de carregar tela
+                const autenticado = await isAuthenticated();
+                if (!autenticado) {
+                    mostrarNotificacao('Sessão expirada. Faça login novamente.', 'error');
+                    window.location.reload();
+                    return;
+                }
+                
+                await carregarTela(telaId, userData);
+                
+                if (window.innerWidth < 768) {
                     const dropdownToggle = document.querySelector('[data-bs-toggle="dropdown"]');
                     if (dropdownToggle) {
                         bootstrap.Dropdown.getInstance(dropdownToggle)?.hide();
@@ -130,14 +195,19 @@ export function carregarMenu(cargo) {
     }
 }
 
-// Função para carregar a tela baseado no ID
+// Carregar tela
 export async function carregarTela(telaId, userData) {
     const contentArea = document.getElementById('contentArea');
-    currentUser = userData;
-    
     if (!contentArea) return;
     
-    // Mostrar loading
+    // Verificar autenticação novamente por segurança
+    const autenticado = await isAuthenticated();
+    if (!autenticado && telaId !== 'home') {
+        mostrarNotificacao('Sessão expirada', 'error');
+        window.location.reload();
+        return;
+    }
+    
     contentArea.innerHTML = `
         <div class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
@@ -180,7 +250,6 @@ export async function carregarTela(telaId, userData) {
         
         if (modulo && modulo.renderizar) {
             await modulo.renderizar(contentArea, userData);
-            // Aplicar background específico da tela
             const perfil = userData?.cargo || 'cliente';
             aplicarBackground(telaId, perfil);
         } else {
@@ -197,76 +266,15 @@ export async function carregarTela(telaId, userData) {
     }
 }
 
-// Verificar sessão do usuário
-export async function verificarSessao() {
-    const sessionData = localStorage.getItem('userSession');
-    if (sessionData) {
-        currentUser = JSON.parse(sessionData);
-        // Verificar se o Firebase Auth ainda está autenticado
-        if (auth.currentUser && auth.currentUser.uid === currentUser.uid) {
-            return currentUser;
-        } else {
-            // Sessão inválida, limpar
-            localStorage.removeItem('userSession');
-            return null;
-        }
-    }
-    return null;
-}
-
-// Logout
-export async function logout() {
-    try {
-        localStorage.removeItem('userSession');
-        currentUser = null;
-        if (auth && signOut) {
-            await signOut(auth);
-        }
-        // Limpar menu
-        const navMenu = document.getElementById('navMenu');
-        if (navMenu) {
-            navMenu.innerHTML = '';
-        }
-        // Resetar para tela de login
-        const contentArea = document.getElementById('contentArea');
-        if (contentArea) {
-            contentArea.innerHTML = `
-                <div class="text-center py-5">
-                    <i class="fas fa-sign-in-alt fa-3x text-primary mb-3"></i>
-                    <h3>Faça login para continuar</h3>
-                    <p>Clique no botão Login no canto superior direito</p>
-                </div>
-            `;
-        }
-        aplicarBackground('home', 'cliente');
-    } catch (error) {
-        console.error('Erro ao fazer logout:', error);
-    }
-}
-
-// Formatar data
-export function formatarData(data) {
-    if (!data) return 'Data não informada';
-    const date = new Date(data);
-    return date.toLocaleDateString('pt-BR');
-}
-
-// Formatar data e hora
-export function formatarDataHora(data) {
-    if (!data) return 'Data não informada';
-    const date = new Date(data);
-    return date.toLocaleString('pt-BR');
-}
-
 // Mostrar notificação
 export function mostrarNotificacao(mensagem, tipo = 'success') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${tipo} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
     alertDiv.style.zIndex = '9999';
     alertDiv.style.minWidth = '300px';
-    alertDiv.style.animation = 'slideIn 0.3s ease';
+    alertDiv.style.zIndex = '10000';
     alertDiv.innerHTML = `
-        <i class="fas ${tipo === 'success' ? 'fa-check-circle' : tipo === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle'} me-2"></i>
+        <i class="fas ${tipo === 'success' ? 'fa-check-circle' : tipo === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} me-2"></i>
         ${mensagem}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
@@ -277,43 +285,9 @@ export function mostrarNotificacao(mensagem, tipo = 'success') {
     }, 4000);
 }
 
-// Validar formulário
-export function validarFormulario(dados, camposObrigatorios) {
-    const erros = [];
-    for (const campo of camposObrigatorios) {
-        if (!dados[campo] || dados[campo].trim() === '') {
-            erros.push(`Campo ${campo} é obrigatório`);
-        }
-    }
-    return erros;
-}
-
-// Gerar ID único
-export function gerarIdUnico() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-// Debounce para evitar chamadas excessivas
-export function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Verificar se é mobile
-export function isMobile() {
-    return window.innerWidth <= 768;
-}
-
-// Recarregar menu atual
-export function recarregarMenu() {
-    if (currentUser) {
-        carregarMenu(currentUser.cargo);
-    }
+// Formatar data
+export function formatarData(data) {
+    if (!data) return 'Data não informada';
+    const date = new Date(data);
+    return date.toLocaleDateString('pt-BR');
 }
