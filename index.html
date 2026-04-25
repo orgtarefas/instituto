@@ -11,14 +11,14 @@
     <link rel="stylesheet" href="0_style.css">
 </head>
 <body>
-    <!-- Header com logo centralizada -->
-    <header class="bg-white shadow-sm sticky-top">
+    <!-- Header -->
+    <header class="shadow-sm sticky-top">
         <nav class="container-fluid">
-            <div class="row align-items-center py-3">
+            <div class="row align-items-center">
                 <!-- Coluna esquerda com menu -->
                 <div class="col-4 d-flex justify-content-start">
                     <div class="dropdown" id="menuContainer" style="display: none;">
-                        <button class="btn btn-link text-dark p-0" type="button" id="menuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-link text-white p-0" type="button" id="menuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-ellipsis-v fa-2x"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-start" id="navMenu">
@@ -27,15 +27,17 @@
                     </div>
                 </div>
                 
-                <!-- Logo centralizada e maior -->
-                <div class="col-4 text-center">
+                <!-- Logo centralizada ocupando toda altura -->
+                <div class="col-4 text-center py-2">
                     <img src="imagens/logo.png" alt="Logo" class="logo-img-center" id="logo">
                 </div>
                 
                 <!-- Coluna direita com botões -->
                 <div class="col-4 d-flex justify-content-end align-items-center gap-2">
                     <div id="authButtons">
-                        <button class="btn btn-primary" id="loginBtn">Login</button>
+                        <button class="btn btn-outline-light" id="loginBtn">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </button>
                     </div>
                 </div>
             </div>
