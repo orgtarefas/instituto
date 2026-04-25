@@ -59,16 +59,47 @@
                 <div class="modal-body">
                     <form id="loginForm">
                         <div class="mb-3">
-                            <label for="username" class="form-label">Usuário</label>
-                            <input type="text" class="form-control" id="username" required autocomplete="username">
+                            <label for="username" class="form-label">Usuário (Login)</label>
+                            <input type="text" class="form-control" id="username" required autocomplete="username" placeholder="Digite seu login">
+                            <small class="text-muted">Ex: thiago.barbosa</small>
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Senha</label>
-                            <input type="password" class="form-control" id="password" required autocomplete="current-password">
+                            <input type="password" class="form-control" id="password" required autocomplete="current-password" placeholder="Digite sua senha">
                         </div>
                         <div id="loginError" class="alert alert-danger d-none"></div>
-                        <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                        <div id="loginLoading" class="text-center d-none">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Autenticando...</span>
+                            </div>
+                            <p class="mt-2">Verificando credenciais...</p>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100" id="submitLoginBtn">
+                            <i class="fas fa-sign-in-alt me-2"></i>Entrar
+                        </button>
                     </form>
+                    <hr class="my-3">
+                    <div class="text-center">
+                        <small class="text-muted">Sistema seguro com autenticação Firebase</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de sessão expirada -->
+    <div class="modal fade" id="sessionExpiredModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">Sessão Expirada</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Sua sessão expirou. Por favor, faça login novamente para continuar.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="reloadLoginBtn">Fazer Login</button>
                 </div>
             </div>
         </div>
@@ -78,7 +109,15 @@
     <script type="module" src="0_firebase_api_config.js"></script>
     <script type="module" src="scripts_telas/0_funcoes_compartilhadas.js"></script>
     <script type="module">
-        import { db, doc, getDoc } from './0_firebase_api_config.js';
+        import { 
+            db, 
+            auth, 
+            signInWithEmailAndPassword, 
+            signOut,
+            onAuthStateChanged,
+            doc, 
+            getDoc 
+        } from './0_firebase_api_config.js';
         import { 
             carregarTela, 
             verificarSessao, 
@@ -90,17 +129,52 @@
 
         let currentUser = null;
         let loginModalInstance = null;
+        let sessionExpiredModalInstance = null;
+
+        // Monitorar estado de autenticação do Firebase
+        onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // Usuário autenticado no Firebase
+                console.log('Usuário autenticado no Firebase:', firebaseUser.email);
+                
+                // Verificar se tem sessão local
+                const localSession = await verificarSessao();
+                if (!localSession) {
+                    // Se não tem sessão local, mas tem Firebase, fazer logout
+                    await signOut(auth);
+                    mostrarNotificacao('Sessão inválida. Faça login novamente.', 'warning');
+                }
+            } else {
+                // Usuário não autenticado no Firebase
+                const localSession = await verificarSessao();
+                if (localSession) {
+                    // Limpar sessão local
+                    localStorage.removeItem('userSession');
+                    mostrarNotificacao('Sessão expirada. Faça login novamente.', 'warning');
+                    await window.verificarAcesso();
+                }
+            }
+        });
 
         // Função principal de verificação de acesso
         window.verificarAcesso = async function() {
             currentUser = await verificarSessao();
             
             if (currentUser) {
+                // Verificar se o Firebase Auth ainda está autenticado
+                if (!auth.currentUser) {
+                    // Se não está autenticado no Firebase, limpar sessão
+                    localStorage.removeItem('userSession');
+                    currentUser = null;
+                    await window.verificarAcesso();
+                    return;
+                }
+                
                 // Usuário logado
                 document.getElementById('authButtons').innerHTML = `
                     <div class="dropdown">
                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user me-1"></i>${currentUser.nome.split(' ')[0]}
+                            <i class="fas fa-user-circle me-1"></i>${currentUser.nome.split(' ')[0]}
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="#" id="logoutBtn">
@@ -112,6 +186,7 @@
                 
                 document.getElementById('logoutBtn').addEventListener('click', async () => {
                     await logout();
+                    await signOut(auth);
                     window.verificarAcesso();
                     mostrarNotificacao('Logout realizado com sucesso!', 'info');
                 });
@@ -122,22 +197,25 @@
             } else {
                 // Usuário não logado
                 document.getElementById('authButtons').innerHTML = '<button class="btn btn-primary" id="loginBtn"><i class="fas fa-sign-in-alt me-2"></i>Login</button>';
-                document.getElementById('loginBtn').addEventListener('click', abrirModalLogin);
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) {
+                    loginBtn.addEventListener('click', abrirModalLogin);
+                }
                 
                 // Limpar menu e mostrar conteúdo padrão
                 const navMenu = document.getElementById('navMenu');
                 if (navMenu) {
-                    navMenu.innerHTML = '<li><a class="dropdown-item disabled" href="#">Faça login para acessar o menu</a></li>';
+                    navMenu.innerHTML = '<li><a class="dropdown-item disabled" href="#"><i class="fas fa-lock me-2"></i>Faça login para acessar o menu</a></li>';
                 }
                 
                 const contentArea = document.getElementById('contentArea');
                 if (contentArea) {
                     contentArea.innerHTML = `
                         <div class="text-center py-5">
-                            <i class="fas fa-lock fa-3x text-secondary mb-3"></i>
-                            <h3>Sistema Protegido</h3>
-                            <p>Por favor, faça login para acessar todas as funcionalidades</p>
-                            <button class="btn btn-primary" onclick="document.getElementById('loginBtn').click()">
+                            <i class="fas fa-lock fa-4x text-secondary mb-4"></i>
+                            <h3 class="mb-3">Sistema Protegido</h3>
+                            <p class="text-muted mb-4">Por favor, faça login para acessar todas as funcionalidades</p>
+                            <button class="btn btn-primary btn-lg" onclick="document.getElementById('loginBtn').click()">
                                 <i class="fas fa-sign-in-alt me-2"></i>Realizar Login
                             </button>
                         </div>
@@ -150,19 +228,32 @@
 
         // Abrir modal de login
         function abrirModalLogin() {
+            // Limpar formulário
+            document.getElementById('loginForm').reset();
+            document.getElementById('loginError').classList.add('d-none');
             loginModalInstance = new bootstrap.Modal(document.getElementById('loginModal'));
             loginModalInstance.show();
         }
 
-        // Processar login
+        // Processar login com Firebase Auth
         document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
+            
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('loginError');
+            const loginLoading = document.getElementById('loginLoading');
+            const submitBtn = document.getElementById('submitLoginBtn');
+
+            // Reset error
+            errorDiv.classList.add('d-none');
+            
+            // Mostrar loading
+            loginLoading.classList.remove('d-none');
+            submitBtn.disabled = true;
 
             try {
-                // Buscar usuário no Firestore
+                // 1. Buscar usuário no Firestore pelo login (documento)
                 const userDoc = await getDoc(doc(db, 'logins', username));
                 
                 if (!userDoc.exists()) {
@@ -171,46 +262,95 @@
 
                 const userData = userDoc.data();
                 
-                // Verificar senha
-                if (userData.senha !== password) {
-                    throw new Error('Senha incorreta');
-                }
-
-                // Verificar status
+                // 2. Verificar se o usuário está ativo
                 if (!userData.status_ativo) {
                     throw new Error('Usuário inativo. Contate o administrador.');
                 }
-
-                // Salvar sessão
+                
+                // 3. Verificar se tem email fake vinculado
+                if (!userData.email || userData.email === '') {
+                    throw new Error('Email não configurado para este usuário. Contate o administrador.');
+                }
+                
+                // 4. Autenticar no Firebase Auth usando o email fake
+                try {
+                    await signInWithEmailAndPassword(auth, userData.email, password);
+                } catch (authError) {
+                    console.error('Erro de autenticação:', authError);
+                    
+                    // Tratar erros específicos do Firebase Auth
+                    switch (authError.code) {
+                        case 'auth/invalid-credential':
+                        case 'auth/wrong-password':
+                        case 'auth/user-not-found':
+                            throw new Error('Senha incorreta. Verifique suas credenciais.');
+                        case 'auth/too-many-requests':
+                            throw new Error('Muitas tentativas falhas. Tente novamente mais tarde.');
+                        default:
+                            throw new Error('Erro na autenticação. Verifique sua senha.');
+                    }
+                }
+                
+                // 5. Salvar sessão local
                 const sessionData = {
                     login: username,
                     nome: userData.nome,
                     cargo: userData.cargo,
                     perfil: userData.perfil,
-                    email: userData.email
+                    email: userData.email,
+                    uid: auth.currentUser?.uid
                 };
                 
                 localStorage.setItem('userSession', JSON.stringify(sessionData));
                 
+                // 6. Fechar modal e mostrar sucesso
                 loginModalInstance.hide();
                 document.getElementById('loginForm').reset();
-                mostrarNotificacao(`Bem-vindo(a) ${userData.nome}!`, 'success');
+                mostrarNotificacao(`Bem-vindo(a) ${userData.nome}! Autenticação realizada com sucesso.`, 'success');
                 
-                // Recarregar a interface
+                // 7. Recarregar a interface
                 await window.verificarAcesso();
                 
             } catch (error) {
+                console.error('Erro no login:', error);
                 errorDiv.textContent = error.message;
                 errorDiv.classList.remove('d-none');
                 
+                // Limpar loading após erro
+                loginLoading.classList.add('d-none');
+                submitBtn.disabled = false;
+                
+                // Se houve erro de autenticação, garantir que o Firebase Auth está limpo
+                if (auth.currentUser) {
+                    await signOut(auth);
+                }
+                
+                // Auto-esconder erro após 3 segundos
                 setTimeout(() => {
                     errorDiv.classList.add('d-none');
                 }, 3000);
+            } finally {
+                // Restaurar botão se não foi redirecionado
+                if (loginLoading && !loginLoading.classList.contains('d-none')) {
+                    loginLoading.classList.add('d-none');
+                    submitBtn.disabled = false;
+                }
             }
         });
 
-        // Inicializar sistema
+        // Verificar sessão ao carregar a página
         window.verificarAcesso();
+        
+        // Verificar periodicamente a sessão (a cada 5 minutos)
+        setInterval(async () => {
+            const session = await verificarSessao();
+            if (session && !auth.currentUser) {
+                // Sessão local existe mas Firebase não está autenticado
+                localStorage.removeItem('userSession');
+                mostrarNotificacao('Sessão expirada. Faça login novamente.', 'warning');
+                window.verificarAcesso();
+            }
+        }, 300000); // 5 minutos
     </script>
 </body>
 </html>
