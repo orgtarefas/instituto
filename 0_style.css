@@ -25,6 +25,9 @@ header {
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     padding: 0;
     margin: 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
 }
 
 /* Logo ocupando toda a altura do header */
@@ -43,6 +46,7 @@ header {
 /* Ajuste do container do header */
 .container-fluid {
     padding: 0 20px;
+    margin: 0;
 }
 
 /* Menu e botões no header */
@@ -124,25 +128,71 @@ header .dropdown-toggle::after {
     transform: translateY(-2px);
 }
 
-/* Main content - sem padding branco */
+/* Main content - sem espaços */
 .main-content {
     margin: 0;
     padding: 0;
     min-height: calc(100vh - 80px);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
 }
 
-/* Content wrapper - sem padding branco extra */
+/* Content wrapper - sem espaços */
 .content-wrapper {
     background-color: transparent;
     border-radius: 0;
-    margin: 0;
-    padding: 20px;
+    margin: 0 !important;
+    padding: 0 !important;
     min-height: calc(100vh - 80px);
 }
 
-/* Conteúdo principal */
+/* Conteúdo principal - sem espaços */
 #contentArea {
     min-height: calc(100vh - 80px);
+    margin: 0;
+    padding: 0;
+}
+
+/* Container do conteúdo - ajuste para remover espaços */
+.container.py-4 {
+    padding-top: 0 !important;
+    padding-bottom: 20px !important;
+    margin-top: 0 !important;
+}
+
+/* Remove padding dos rows e cols */
+.row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+[class*="col-"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* Ajuste do carrossel para ficar sem espaços */
+.carousel {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.carousel-item {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.carousel-inner {
+    border-radius: 0 !important;
+}
+
+.carousel-img {
+    height: 500px;
+    object-fit: cover;
+    width: 100%;
+    display: block;
 }
 
 /* Cards e componentes */
@@ -169,17 +219,20 @@ header .dropdown-toggle::after {
     transition: all 0.3s ease;
 }
 
-/* Carrossel */
-.carousel-img {
-    height: 400px;
-    object-fit: cover;
-    border-radius: 10px;
-}
-
+/* Carrossel caption */
 .carousel-caption {
     background: rgba(0,0,0,0.6);
     border-radius: 10px;
     bottom: 20px;
+    left: 10%;
+    right: 10%;
+    padding: 15px;
+}
+
+.carousel-caption h5,
+.carousel-caption p {
+    margin: 0;
+    padding: 0;
 }
 
 .carousel-control-prev,
@@ -207,12 +260,13 @@ header .dropdown-toggle::after {
     }
     
     .carousel-img {
-        height: 250px;
+        height: 300px;
     }
     
     .carousel-caption {
         font-size: 12px;
         padding: 8px;
+        bottom: 10px;
     }
     
     .carousel-caption h5 {
@@ -251,6 +305,17 @@ header .dropdown-toggle::after {
     header .container-fluid {
         padding: 0 10px;
     }
+    
+    /* Ajuste das colunas no mobile */
+    [class*="col-"] {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+    
+    .row {
+        margin-left: -8px !important;
+        margin-right: -8px !important;
+    }
 }
 
 /* Desktop */
@@ -262,6 +327,19 @@ header .dropdown-toggle::after {
     .container {
         max-width: 1200px;
         margin: 0 auto;
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    /* Ajuste das colunas no desktop */
+    [class*="col-"] {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+    
+    .row {
+        margin-left: -12px !important;
+        margin-right: -12px !important;
     }
 }
 
@@ -409,33 +487,20 @@ header .dropdown-toggle::after {
     background: rgba(255,255,255,0.3) !important;
 }
 
-/* Container padding adjustment */
-.container {
-    padding-left: 15px;
-    padding-right: 15px;
+/* Ajuste do título da seção */
+h2.text-center {
+    margin-top: 20px;
+    margin-bottom: 20px;
 }
 
-/* Ajuste para o background das telas */
-.main-content {
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
-}
-
-/* Remove qualquer margem/padding extra */
-.row {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-.col-12, .col-4, .col-6, .col-md-6, .col-lg-3 {
-    padding-left: 0;
-    padding-right: 0;
-}
-
-/* Ajuste específico para o container do conteúdo */
-.container.py-4 {
+/* Primeira seção (Novidades) - sem margem superior */
+.row.mb-5:first-child {
+    margin-top: 0 !important;
     padding-top: 0 !important;
-    padding-bottom: 20px !important;
+}
+
+/* Remove espaço antes do carrossel */
+.row.mb-5 {
+    margin-top: 0;
+    padding-top: 0;
 }
