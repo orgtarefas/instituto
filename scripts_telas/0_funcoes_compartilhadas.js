@@ -1,4 +1,4 @@
-import { auth, db, doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where, orderBy, updateDoc } from '../0_firebase_api_config.js';
+import { auth, db, doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } from '../0_firebase_api_config.js';
 
 // ==================== FUNÇÕES DE AUTENTICAÇÃO ====================
 
@@ -57,7 +57,6 @@ export async function getImgBBKey() {
 export async function uploadImageToImgBB(file, onProgress) {
     return new Promise(async (resolve, reject) => {
         try {
-            // Buscar a chave da API
             const apiKey = await getImgBBKey();
             
             const formData = new FormData();
@@ -102,18 +101,17 @@ export async function uploadImageToImgBB(file, onProgress) {
     });
 }
 
-// Salvar imagem do carrossel no Firestore
+// Salvar imagem do carrossel no Firestore (SEM ORDENAÇÃO)
 export async function salvarImagemCarrossel(dados) {
     try {
         const docRef = await addDoc(collection(db, 'carrossel_novidades'), {
             titulo: dados.titulo,
             descricao: dados.descricao,
             imagem_url: dados.imagem_url,
-            tipo: dados.tipo,
-            ordem: dados.ordem || Date.now(),
-            ativo: true,
+            tipo: dados.tipo || 'novidades',
             criado_em: new Date().toISOString(),
-            criado_por: dados.criado_por
+            criado_por: dados.criado_por,
+            ativo: true
         });
         return docRef.id;
     } catch (error) {
@@ -122,18 +120,23 @@ export async function salvarImagemCarrossel(dados) {
     }
 }
 
-// Buscar imagens do carrossel de novidades
+// Buscar imagens do carrossel de novidades (SEM ORDER BY)
 export async function buscarImagensNovidades() {
     try {
         const q = query(
             collection(db, 'carrossel_novidades'), 
-            where('ativo', '==', true), 
-            orderBy('ordem')
+            where('ativo', '==', true)
         );
         const querySnapshot = await getDocs(q);
         const imagens = [];
         querySnapshot.forEach((doc) => {
             imagens.push({ id: doc.id, ...doc.data() });
+        });
+        // Ordenar em memória (mais recentes primeiro)
+        imagens.sort((a, b) => {
+            const dateA = new Date(a.criado_em || 0);
+            const dateB = new Date(b.criado_em || 0);
+            return dateB - dateA;
         });
         return imagens;
     } catch (error) {
@@ -155,25 +158,27 @@ export async function excluirImagemCarrossel(id) {
 
 // ==================== FUNÇÕES DE BACKGROUND ====================
 
-// Aplicar background
+// Aplicar background (caminhos corrigidos)
 export function aplicarBackground(telaId, perfil) {
     const mainContent = document.getElementById('mainContent');
     if (!mainContent) return;
     
+    const isCliente = (perfil === 'Cliente' || perfil === 'cliente');
+    
+    // Mapeamento de backgrounds com caminhos relativos
     const backgrounds = {
-        'home_clientes': 'url("../imagens/backgrounds/background_home_clientes.png")',
-        'home_funcionarios': 'url("../imagens/backgrounds/background_home_funcionarios.png")',
-        'agendamentos_clientes': 'url("../imagens/backgrounds/background_agendamentos_clientes.png")',
-        'agendamentos_funcionarios': 'url("../imagens/backgrounds/background_agendamentos_funcionarios.png")',
-        'palestras_clientes': 'url("../imagens/backgrounds/background_palestras_clientes.png")',
-        'palestras_funcionarios': 'url("../imagens/backgrounds/background_palestras_funcionarios.png")',
-        'cursos_clientes': 'url("../imagens/backgrounds/background_cursos_clientes.png")',
-        'cursos_funcionarios': 'url("../imagens/backgrounds/background_cursos_funcionarios.png")',
-        'cadastros_funcionarios': 'url("../imagens/backgrounds/background_cadastros_funcionarios.png")'
+        'home_clientes': './imagens/backgrounds/background_home_clientes.png',
+        'home_funcionarios': './imagens/backgrounds/background_home_funcionarios.png',
+        'agendamentos_clientes': './imagens/backgrounds/background_agendamentos_clientes.png',
+        'agendamentos_funcionarios': './imagens/backgrounds/background_agendamentos_funcionarios.png',
+        'palestras_clientes': './imagens/backgrounds/background_palestras_clientes.png',
+        'palestras_funcionarios': './imagens/backgrounds/background_palestras_funcionarios.png',
+        'cursos_clientes': './imagens/backgrounds/background_cursos_clientes.png',
+        'cursos_funcionarios': './imagens/backgrounds/background_cursos_funcionarios.png',
+        'cadastros_funcionarios': './imagens/backgrounds/background_cadastros_funcionarios.png'
     };
     
     let backgroundKey = '';
-    const isCliente = (perfil === 'Cliente' || perfil === 'cliente');
     
     switch(telaId) {
         case 'home':
@@ -204,8 +209,9 @@ export function aplicarBackground(telaId, perfil) {
             backgroundKey = isCliente ? 'home_clientes' : 'home_funcionarios';
     }
     
-    if (backgrounds[backgroundKey]) {
-        mainContent.style.backgroundImage = backgrounds[backgroundKey];
+    const backgroundImage = backgrounds[backgroundKey];
+    if (backgroundImage) {
+        mainContent.style.backgroundImage = `url('${backgroundImage}')`;
         mainContent.style.backgroundSize = 'cover';
         mainContent.style.backgroundPosition = 'center';
         mainContent.style.backgroundAttachment = 'fixed';
