@@ -155,7 +155,7 @@ header .dropdown-toggle::after {
     padding: 0;
 }
 
-/* Container do conteúdo - ajuste para remover espaços */
+/* Container do conteúdo */
 .container.py-4 {
     padding-top: 0 !important;
     padding-bottom: 20px !important;
@@ -173,10 +173,11 @@ header .dropdown-toggle::after {
     padding-right: 0 !important;
 }
 
-/* Ajuste do carrossel para ficar sem espaços */
+/* ==================== CARROSSEL - IMAGEM ORIGINAL ==================== */
 .carousel {
     margin-top: 0 !important;
     padding-top: 0 !important;
+    background: transparent;
 }
 
 .carousel-item {
@@ -186,13 +187,46 @@ header .dropdown-toggle::after {
 
 .carousel-inner {
     border-radius: 0 !important;
+    background: transparent;
 }
 
+/* Imagem do carrossel - mantém formato original */
 .carousel-img {
-    height: 500px;
-    object-fit: cover;
     width: 100%;
+    height: auto;
+    max-height: 500px;
+    object-fit: contain;
     display: block;
+    background: transparent;
+}
+
+/* Para mobile */
+@media (max-width: 768px) {
+    .carousel-img {
+        max-height: 300px;
+    }
+}
+
+/* Carrossel caption */
+.carousel-caption {
+    background: rgba(0,0,0,0.6);
+    border-radius: 10px;
+    bottom: 20px;
+    left: 10%;
+    right: 10%;
+    padding: 15px;
+}
+
+.carousel-caption h5,
+.carousel-caption p {
+    margin: 0;
+    padding: 0;
+}
+
+.carousel-control-prev,
+.carousel-control-next {
+    width: 5%;
+    opacity: 0.8;
 }
 
 /* Cards e componentes */
@@ -219,28 +253,6 @@ header .dropdown-toggle::after {
     transition: all 0.3s ease;
 }
 
-/* Carrossel caption */
-.carousel-caption {
-    background: rgba(0,0,0,0.6);
-    border-radius: 10px;
-    bottom: 20px;
-    left: 10%;
-    right: 10%;
-    padding: 15px;
-}
-
-.carousel-caption h5,
-.carousel-caption p {
-    margin: 0;
-    padding: 0;
-}
-
-.carousel-control-prev,
-.carousel-control-next {
-    width: 5%;
-    opacity: 0.8;
-}
-
 /* Animações */
 @keyframes slideIn {
     from {
@@ -257,10 +269,6 @@ header .dropdown-toggle::after {
 @media (max-width: 768px) {
     .logo-img-center {
         height: 50px;
-    }
-    
-    .carousel-img {
-        height: 300px;
     }
     
     .carousel-caption {
@@ -320,10 +328,6 @@ header .dropdown-toggle::after {
 
 /* Desktop */
 @media (min-width: 769px) {
-    .carousel-img {
-        height: 500px;
-    }
-    
     .container {
         max-width: 1200px;
         margin: 0 auto;
@@ -493,13 +497,12 @@ h2.text-center {
     margin-bottom: 20px;
 }
 
-/* Primeira seção (Novidades) - sem margem superior */
+/* Primeira seção - sem margem superior */
 .row.mb-5:first-child {
     margin-top: 0 !important;
     padding-top: 0 !important;
 }
 
-/* Remove espaço antes do carrossel */
 .row.mb-5 {
     margin-top: 0;
     padding-top: 0;
