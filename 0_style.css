@@ -17,24 +17,64 @@ body {
     min-height: 100vh;
 }
 
-/* Logo centralizada e maior */
+/* Header com gradiente rosa e laranja */
+header {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff8c42 50%, #ff6b6b 100%);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    padding: 0;
+    margin: 0;
+}
+
+/* Logo ocupando toda a altura do header */
 .logo-img-center {
-    height: 70px;
+    height: 80px;
     width: auto;
     object-fit: contain;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));
+    transition: transform 0.3s ease;
 }
 
-/* Header adjustments */
-header {
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.logo-img-center:hover {
+    transform: scale(1.02);
 }
 
-/* Menu de navegação */
+/* Ajuste do container do header */
+.container-fluid {
+    padding: 0 20px;
+}
+
+/* Menu e botões no header */
+header .btn-link {
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+
+header .btn-link:hover {
+    color: #fff !important;
+    opacity: 0.9;
+}
+
+header .btn-outline-secondary {
+    color: white;
+    border-color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.1);
+}
+
+header .btn-outline-secondary:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: white;
+}
+
+header .dropdown-toggle::after {
+    color: white;
+}
+
+/* Dropdown menu personalizado */
 .dropdown-menu {
     border-radius: 10px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     border: none;
+    margin-top: 10px;
 }
 
 .dropdown-item {
@@ -43,12 +83,43 @@ header {
 }
 
 .dropdown-item:hover {
-    background-color: var(--primary-color);
+    background: linear-gradient(135deg, #ff6b6b, #ff8c42);
     color: white;
 }
 
 .dropdown-item i {
     width: 20px;
+}
+
+/* Botão de login no header */
+#loginBtn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+#loginBtn:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: white;
+    transform: translateY(-2px);
+}
+
+/* Botões de gerenciamento */
+#btnGerenciarCarrossel,
+#btnGerenciarServicos {
+    font-size: 12px;
+    padding: 5px 12px;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+#btnGerenciarCarrossel:hover,
+#btnGerenciarServicos:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
 }
 
 /* Conteúdo principal */
@@ -112,7 +183,7 @@ header {
 /* Responsividade */
 @media (max-width: 768px) {
     .logo-img-center {
-        height: 45px;
+        height: 50px;
     }
     
     .carousel-img {
@@ -150,6 +221,16 @@ header {
     .rounded-circle i {
         font-size: 24px !important;
     }
+    
+    #btnGerenciarCarrossel,
+    #btnGerenciarServicos {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+    
+    header .container-fluid {
+        padding: 0 10px;
+    }
 }
 
 /* Desktop */
@@ -175,18 +256,19 @@ header {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #888;
+    background: linear-gradient(135deg, #ff6b6b, #ff8c42);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: linear-gradient(135deg, #ff8c42, #ff6b6b);
 }
 
 /* Loading spinner */
 .spinner-border {
     width: 3rem;
     height: 3rem;
+    color: #ff6b6b !important;
 }
 
 /* Alertas */
@@ -208,6 +290,18 @@ header {
     border-radius: 15px 15px 0 0;
 }
 
+.modal-header.bg-primary {
+    background: linear-gradient(135deg, #ff6b6b, #ff8c42) !important;
+}
+
+.modal-header.bg-success {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+}
+
+.modal-header.bg-info {
+    background: linear-gradient(135deg, #17a2b8, #6f42c1) !important;
+}
+
 /* Progress bar */
 .progress {
     border-radius: 10px;
@@ -217,6 +311,7 @@ header {
 .progress-bar {
     border-radius: 10px;
     transition: width 0.3s ease;
+    background: linear-gradient(135deg, #ff6b6b, #ff8c42);
 }
 
 /* List group */
@@ -242,13 +337,13 @@ header {
 }
 
 .nav-tabs .nav-link:hover {
-    color: var(--primary-color);
+    color: #ff6b6b;
     border: none;
 }
 
 .nav-tabs .nav-link.active {
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
+    color: #ff6b6b;
+    border-bottom: 2px solid #ff6b6b;
     background: transparent;
 }
 
@@ -259,19 +354,47 @@ header {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.3s ease;
 }
 
-/* Botões de gerenciamento */
-#btnGerenciarCarrossel,
-#btnGerenciarServicos {
-    font-size: 12px;
-    padding: 5px 10px;
+.hover-card:hover .rounded-circle {
+    transform: scale(1.1);
 }
 
-@media (max-width: 768px) {
-    #btnGerenciarCarrossel,
-    #btnGerenciarServicos {
-        font-size: 10px;
-        padding: 4px 8px;
-    }
+/* Cores dos ícones de serviço */
+.bg-primary.bg-opacity-10 {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+.bg-success.bg-opacity-10 {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+.bg-info.bg-opacity-10 {
+    background-color: rgba(13, 202, 240, 0.1) !important;
+}
+
+.bg-warning.bg-opacity-10 {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+/* Texto do usuário logado */
+.dropdown-toggle {
+    background: rgba(255,255,255,0.2) !important;
+    border: 1px solid rgba(255,255,255,0.5) !important;
+    color: white !important;
+}
+
+.dropdown-toggle:hover {
+    background: rgba(255,255,255,0.3) !important;
+}
+
+/* Ajuste do wrapper de conteúdo */
+.content-wrapper {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    margin: 20px;
+    padding: 20px;
+    min-height: calc(100vh - 120px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
