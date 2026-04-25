@@ -19,15 +19,17 @@
                     <img src="imagens/logo.png" alt="Logo" class="logo-img" id="logo">
                 </div>
                 <div class="col-6 d-flex justify-content-end align-items-center">
-                    <div class="dropdown">
+                    <!-- Menu de 3 pontinhos (SÓ APARECE QUANDO LOGADO) -->
+                    <div class="dropdown" id="menuContainer" style="display: none;">
                         <button class="btn btn-link text-dark p-0" type="button" id="menuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-ellipsis-v fa-2x"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" id="navMenu">
-                            <li><a class="dropdown-item disabled" href="#">Faça login primeiro</a></li>
+                            <li><a class="dropdown-item disabled" href="#">Carregando...</a></li>
                         </ul>
                     </div>
                     
+                    <!-- Área de autenticação -->
                     <div id="authButtons" class="ms-3">
                         <button class="btn btn-primary" id="loginBtn">Login</button>
                     </div>
@@ -36,13 +38,10 @@
         </nav>
     </header>
 
+    <!-- Conteúdo Principal -->
     <main class="main-content" id="mainContent">
         <div class="content-wrapper" id="contentArea">
-            <div class="text-center py-5">
-                <i class="fas fa-shield-alt fa-4x text-primary mb-4"></i>
-                <h3>Sistema Seguro</h3>
-                <p class="text-muted">Faça login para acessar o sistema</p>
-            </div>
+            <!-- Conteúdo dinâmico -->
         </div>
     </main>
 
@@ -51,7 +50,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Login Seguro</h5>
+                    <h5 class="modal-title">Acesso ao Sistema</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -78,8 +77,56 @@
         </div>
     </div>
 
+    <!-- Modal de Upload de Imagem -->
+    <div class="modal fade" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Gerenciar Imagens do Carrossel</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="uploadForm">
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Carrossel</label>
+                            <select class="form-control" id="tipoCarrossel" required>
+                                <option value="novidades">Novidades (Dinâmico)</option>
+                                <option value="servicos">Serviços (Fixos)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Título</label>
+                            <input type="text" class="form-control" id="tituloImagem" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descrição</label>
+                            <textarea class="form-control" id="descricaoImagem" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Imagem</label>
+                            <input type="file" class="form-control" id="imagemUpload" accept="image/*" required>
+                        </div>
+                        <div id="uploadProgress" class="d-none">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+                            </div>
+                        </div>
+                        <div id="uploadError" class="alert alert-danger d-none"></div>
+                        <button type="submit" class="btn btn-success w-100">Upload para ImgBB</button>
+                    </form>
+                    <hr>
+                    <h6>Imagens Cadastradas</h6>
+                    <div id="listaImagens" style="max-height: 300px; overflow-y: auto;">
+                        <p class="text-muted">Carregando...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="0_firebase_api_config.js"></script>
+    <script type="module" src="scripts_telas/0_funcoes_compartilhadas.js"></script>
     <script type="module">
         import { 
             db, 
@@ -89,55 +136,69 @@
             onAuthStateChanged,
             doc, 
             getDoc,
-            query,
+            getDocs,
             collection,
+            query,
             where,
-            getDocs
+            orderBy
         } from './0_firebase_api_config.js';
         import { 
             carregarTela, 
             carregarMenu,
             mostrarNotificacao,
             aplicarBackground,
-            getCurrentUser
+            getCurrentUser,
+            isAuthenticated,
+            verificarPermissaoAdmin,
+            getImgBBKey
         } from './scripts_telas/0_funcoes_compartilhadas.js';
+        import { uploadImageToImgBB } from './scripts_telas/upload_imgbb.js';
 
         let loginModalInstance = null;
+        let uploadModalInstance = null;
         let currentUserData = null;
 
-        // Monitorar estado de autenticação (FONTE ÚNICA DA VERDADE)
+        // Monitorar estado de autenticação
         onAuthStateChanged(auth, async (firebaseUser) => {
+            const menuContainer = document.getElementById('menuContainer');
+            
             if (firebaseUser) {
-                // Usuário autenticado no Firebase - buscar dados atualizados
                 console.log('✅ Usuário autenticado:', firebaseUser.email);
                 
                 try {
-                    // Buscar dados do Firestore usando o email
-                    const loginsRef = collection(db, 'logins');
-                    const q = query(loginsRef, where('email', '==', firebaseUser.email));
-                    const querySnapshot = await getDocs(q);
+                    // Buscar dados do Firestore
+                    const userDoc = await getDoc(doc(db, 'logins', firebaseUser.uid));
+                    let userData = null;
                     
-                    if (!querySnapshot.empty) {
-                        querySnapshot.forEach((doc) => {
-                            currentUserData = {
-                                uid: firebaseUser.uid,
-                                login: doc.id,
-                                nome: doc.data().nome,
-                                cargo: doc.data().cargo,
-                                perfil: doc.data().perfil,
-                                email: doc.data().email,
-                                status_ativo: doc.data().status_ativo
-                            };
-                        });
+                    if (userDoc.exists()) {
+                        userData = userDoc.data();
+                        currentUserData = {
+                            uid: firebaseUser.uid,
+                            login: userDoc.id,
+                            ...userData
+                        };
+                    } else {
+                        // Buscar por email
+                        const loginsRef = collection(db, 'logins');
+                        const q = query(loginsRef, where('email', '==', firebaseUser.email));
+                        const querySnapshot = await getDocs(q);
                         
-                        // Verificar se está ativo
-                        if (!currentUserData.status_ativo) {
-                            await signOut(auth);
-                            mostrarNotificacao('Usuário inativo. Contate o administrador.', 'error');
-                            return;
+                        if (!querySnapshot.empty) {
+                            querySnapshot.forEach((doc) => {
+                                currentUserData = {
+                                    uid: firebaseUser.uid,
+                                    login: doc.id,
+                                    ...doc.data()
+                                };
+                            });
                         }
+                    }
+                    
+                    if (currentUserData && currentUserData.status_ativo) {
+                        // Mostrar menu
+                        menuContainer.style.display = 'block';
                         
-                        // Atualizar interface
+                        // Atualizar botão de login
                         document.getElementById('authButtons').innerHTML = `
                             <div class="dropdown">
                                 <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -154,6 +215,8 @@
                         document.getElementById('logoutBtn').addEventListener('click', async () => {
                             await signOut(auth);
                             currentUserData = null;
+                            menuContainer.style.display = 'none';
+                            window.location.reload();
                             mostrarNotificacao('Logout realizado com sucesso!', 'info');
                         });
                         
@@ -161,60 +224,186 @@
                         carregarMenu(currentUserData.cargo, currentUserData);
                         await carregarTela('home', currentUserData);
                         
+                        // Verificar se pode gerenciar imagens
+                        const podeGerenciar = await verificarPermissaoAdmin(currentUserData);
+                        if (podeGerenciar) {
+                            adicionarBotaoGerenciar();
+                        }
+                        
                     } else {
-                        // Usuário autenticado mas sem dados no Firestore
-                        console.error('Usuário sem permissões');
                         await signOut(auth);
-                        mostrarNotificacao('Usuário não autorizado no sistema.', 'error');
+                        menuContainer.style.display = 'none';
+                        carregarHomePublica();
                     }
                     
                 } catch (error) {
-                    console.error('Erro ao buscar dados:', error);
+                    console.error('Erro:', error);
                     await signOut(auth);
-                    mostrarNotificacao('Erro ao carregar dados do usuário.', 'error');
+                    menuContainer.style.display = 'none';
+                    carregarHomePublica();
                 }
                 
             } else {
                 // Usuário não autenticado
                 currentUserData = null;
+                menuContainer.style.display = 'none';
                 
-                // Limpar qualquer dado sensível
-                sessionStorage.clear();
-                
-                // Mostrar tela de login
                 document.getElementById('authButtons').innerHTML = '<button class="btn btn-primary" id="loginBtn"><i class="fas fa-sign-in-alt me-2"></i>Login</button>';
-                const loginBtn = document.getElementById('loginBtn');
-                if (loginBtn) {
-                    loginBtn.removeEventListener('click', abrirModalLogin);
-                    loginBtn.addEventListener('click', abrirModalLogin);
-                }
+                document.getElementById('loginBtn').addEventListener('click', abrirModalLogin);
                 
-                // Limpar menu
-                const navMenu = document.getElementById('navMenu');
-                if (navMenu) {
-                    navMenu.innerHTML = '<li><a class="dropdown-item disabled" href="#"><i class="fas fa-lock me-2"></i>Faça login</a></li>';
-                }
-                
-                // Tela de boas-vindas
-                const contentArea = document.getElementById('contentArea');
-                if (contentArea) {
-                    contentArea.innerHTML = `
-                        <div class="text-center py-5">
-                            <i class="fas fa-shield-alt fa-4x text-primary mb-4"></i>
-                            <h3 class="mb-3">Sistema Seguro</h3>
-                            <p class="text-muted mb-4">Autenticação via Firebase</p>
-                            <button class="btn btn-primary btn-lg" id="telaLoginBtn">
-                                <i class="fas fa-sign-in-alt me-2"></i>Fazer Login
-                            </button>
-                        </div>
-                    `;
-                    
-                    document.getElementById('telaLoginBtn')?.addEventListener('click', abrirModalLogin);
-                }
-                
-                aplicarBackground('home', 'cliente');
+                carregarHomePublica();
             }
         });
+        
+        function adicionarBotaoGerenciar() {
+            const authButtons = document.getElementById('authButtons');
+            const btnGerenciar = document.createElement('button');
+            btnGerenciar.className = 'btn btn-success ms-2';
+            btnGerenciar.innerHTML = '<i class="fas fa-images me-1"></i>Gerenciar Carrossel';
+            btnGerenciar.onclick = () => abrirModalUpload();
+            authButtons.appendChild(btnGerenciar);
+        }
+        
+        async function carregarHomePublica() {
+            const contentArea = document.getElementById('contentArea');
+            const carrosselNovidades = await carregarCarrosselNovidades();
+            const carrosselServicos = carregarCarrosselServicos();
+            
+            contentArea.innerHTML = `
+                <div class="container py-4">
+                    <!-- Seção Novidades -->
+                    <div class="row mb-5">
+                        <div class="col-12">
+                            <h2 class="text-center mb-4">
+                                <i class="fas fa-newspaper text-primary me-2"></i>
+                                Novidades
+                            </h2>
+                            ${carrosselNovidades}
+                        </div>
+                    </div>
+                    
+                    <!-- Seção Serviços -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h2 class="text-center mb-4">
+                                <i class="fas fa-cogs text-primary me-2"></i>
+                                Nossos Serviços
+                            </h2>
+                            ${carrosselServicos}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            aplicarBackground('home', 'cliente');
+        }
+        
+        async function carregarCarrosselNovidades() {
+            try {
+                const novidadesRef = collection(db, 'carrossel_novidades');
+                const q = query(novidadesRef, where('ativo', '==', true), orderBy('ordem'));
+                const querySnapshot = await getDocs(q);
+                
+                let imagens = [];
+                querySnapshot.forEach((doc) => {
+                    imagens.push({ id: doc.id, ...doc.data() });
+                });
+                
+                if (imagens.length === 0) {
+                    return `
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Nenhuma novidade cadastrada no momento.
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div id="carouselNovidades" class="carousel slide" data-bs-ride="carousel">
+                        <div class="carousel-indicators">
+                            ${imagens.map((img, idx) => `
+                                <button type="button" data-bs-target="#carouselNovidades" data-bs-slide-to="${idx}" 
+                                        class="${idx === 0 ? 'active' : ''}" aria-current="${idx === 0 ? 'true' : 'false'}"></button>
+                            `).join('')}
+                        </div>
+                        <div class="carousel-inner rounded-4 shadow">
+                            ${imagens.map((img, idx) => `
+                                <div class="carousel-item ${idx === 0 ? 'active' : ''}">
+                                    <img src="${img.imagem_url}" class="d-block w-100 carousel-img" alt="${img.titulo}">
+                                    <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded-3 p-3">
+                                        <h5>${img.titulo}</h5>
+                                        <p>${img.descricao || ''}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carouselNovidades" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carouselNovidades" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Próximo</span>
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erro ao carregar novidades:', error);
+                return '<div class="alert alert-warning">Erro ao carregar novidades</div>';
+            }
+        }
+        
+        function carregarCarrosselServicos() {
+            const servicos = [
+                {
+                    id: 'agendamentos',
+                    titulo: 'Agendamentos',
+                    descricao: 'Agende seus horários de forma fácil e rápida',
+                    icone: 'fa-calendar-alt',
+                    cor: 'primary'
+                },
+                {
+                    id: 'palestras',
+                    titulo: 'Palestras',
+                    descricao: 'Participe das nossas palestras online',
+                    icone: 'fa-chalkboard-user',
+                    cor: 'success'
+                },
+                {
+                    id: 'cursos',
+                    titulo: 'Cursos',
+                    descricao: 'Acesse cursos exclusivos',
+                    icone: 'fa-graduation-cap',
+                    cor: 'info'
+                },
+                {
+                    id: 'junte-se',
+                    titulo: 'Junte-se ao Instituto',
+                    descricao: 'Faça parte do nosso time',
+                    icone: 'fa-users',
+                    cor: 'warning'
+                }
+            ];
+            
+            return `
+                <div class="row g-4">
+                    ${servicos.map(servico => `
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card h-100 text-center shadow-sm hover-card">
+                                <div class="card-body">
+                                    <div class="rounded-circle bg-${servico.cor} bg-opacity-10 p-3 d-inline-block mb-3">
+                                        <i class="fas ${servico.icone} fa-3x text-${servico.cor}"></i>
+                                    </div>
+                                    <h5 class="card-title">${servico.titulo}</h5>
+                                    <p class="card-text text-muted">${servico.descricao}</p>
+                                    <small class="text-muted">Em breve mais informações</small>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
         
         function abrirModalLogin() {
             const modalElement = document.getElementById('loginModal');
@@ -223,8 +412,65 @@
             document.getElementById('loginError').classList.add('d-none');
             loginModalInstance.show();
         }
-
-        // Processar login
+        
+        function abrirModalUpload() {
+            uploadModalInstance = new bootstrap.Modal(document.getElementById('uploadModal'));
+            document.getElementById('uploadForm').reset();
+            document.getElementById('uploadError').classList.add('d-none');
+            carregarListaImagens();
+            uploadModalInstance.show();
+        }
+        
+        async function carregarListaImagens() {
+            const listaDiv = document.getElementById('listaImagens');
+            listaDiv.innerHTML = '<p class="text-muted">Carregando...</p>';
+            
+            try {
+                const novidadesRef = collection(db, 'carrossel_novidades');
+                const q = query(novidadesRef, orderBy('ordem'));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    listaDiv.innerHTML = '<p class="text-muted">Nenhuma imagem cadastrada</p>';
+                    return;
+                }
+                
+                listaDiv.innerHTML = '<div class="list-group">';
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    listaDiv.innerHTML += `
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${data.titulo}</strong>
+                                    <br>
+                                    <small class="text-muted">Ordem: ${data.ordem || 0}</small>
+                                </div>
+                                <button class="btn btn-sm btn-danger" onclick="excluirImagem('${doc.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                listaDiv.innerHTML += '</div>';
+                
+                window.excluirImagem = async (id) => {
+                    if (confirm('Deseja excluir esta imagem?')) {
+                        const { deleteDoc, doc } = await import('./0_firebase_api_config.js');
+                        await deleteDoc(doc(db, 'carrossel_novidades', id));
+                        mostrarNotificacao('Imagem excluída!', 'success');
+                        carregarListaImagens();
+                        carregarHomePublica();
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                listaDiv.innerHTML = '<p class="text-danger">Erro ao carregar imagens</p>';
+            }
+        }
+        
         document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -239,7 +485,6 @@
             submitBtn.disabled = true;
 
             try {
-                // 1. Buscar email no Firestore
                 const userDoc = await getDoc(doc(db, 'logins', username));
                 
                 if (!userDoc.exists()) {
@@ -248,33 +493,25 @@
 
                 const userData = userDoc.data();
                 
-                // 2. Verificar status
                 if (!userData.status_ativo) {
                     throw new Error('Usuário inativo');
                 }
                 
-                // 3. Verificar email
                 if (!userData.email) {
                     throw new Error('Email não configurado');
                 }
                 
-                // 4. Autenticar no Firebase Auth (ÚNICA VALIDAÇÃO DE SENHA)
                 await signInWithEmailAndPassword(auth, userData.email, password);
                 
-                // 5. Fechar modal
                 loginModalInstance.hide();
                 mostrarNotificacao(`Bem-vindo(a) ${userData.nome}!`, 'success');
                 
             } catch (error) {
-                console.error('Erro no login:', error);
-                
+                console.error('Erro:', error);
                 let mensagem = error.message;
-                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+                if (error.code === 'auth/invalid-credential') {
                     mensagem = 'Usuário ou senha incorretos';
-                } else if (error.code === 'auth/too-many-requests') {
-                    mensagem = 'Muitas tentativas. Tente mais tarde';
                 }
-                
                 errorDiv.textContent = mensagem;
                 errorDiv.classList.remove('d-none');
                 loginLoading.classList.add('d-none');
@@ -282,18 +519,63 @@
             }
         });
         
-        // Proteção contra XSS - Sanitização
-        function sanitizarHTML(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-        
-        // Configurar CSP (Content Security Policy) no meta tag
-        const meta = document.createElement('meta');
-        meta.httpEquiv = 'Content-Security-Policy';
-        meta.content = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com 'unsafe-inline'; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';";
-        document.head.appendChild(meta);
+        document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const tipo = document.getElementById('tipoCarrossel').value;
+            const titulo = document.getElementById('tituloImagem').value;
+            const descricao = document.getElementById('descricaoImagem').value;
+            const file = document.getElementById('imagemUpload').files[0];
+            const errorDiv = document.getElementById('uploadError');
+            const submitBtn = document.querySelector('#uploadForm button[type="submit"]');
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = progressDiv.querySelector('.progress-bar');
+            
+            if (!file) {
+                errorDiv.textContent = 'Selecione uma imagem';
+                errorDiv.classList.remove('d-none');
+                return;
+            }
+            
+            errorDiv.classList.add('d-none');
+            progressDiv.classList.remove('d-none');
+            submitBtn.disabled = true;
+            
+            try {
+                const imgbbKey = await getImgBBKey();
+                const imageUrl = await uploadImageToImgBB(file, imgbbKey, (progress) => {
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.textContent = `${progress}%`;
+                });
+                
+                const { addDoc, collection, serverTimestamp } = await import('./0_firebase_api_config.js');
+                
+                await addDoc(collection(db, 'carrossel_novidades'), {
+                    titulo: titulo,
+                    descricao: descricao,
+                    imagem_url: imageUrl,
+                    tipo: tipo,
+                    ordem: Date.now(),
+                    ativo: true,
+                    criado_em: new Date(),
+                    criado_por: currentUserData?.login || 'admin'
+                });
+                
+                mostrarNotificacao('Imagem cadastrada com sucesso!', 'success');
+                uploadModalInstance.hide();
+                document.getElementById('uploadForm').reset();
+                carregarHomePublica();
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('d-none');
+            } finally {
+                progressDiv.classList.add('d-none');
+                submitBtn.disabled = false;
+                progressBar.style.width = '0%';
+            }
+        });
     </script>
 </body>
 </html>
