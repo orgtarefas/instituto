@@ -19,7 +19,6 @@
                     <img src="imagens/logo.png" alt="Logo" class="logo-img" id="logo">
                 </div>
                 <div class="col-6 d-flex justify-content-end align-items-center">
-                    <!-- Menu de 3 pontinhos -->
                     <div class="dropdown">
                         <button class="btn btn-link text-dark p-0" type="button" id="menuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-ellipsis-v fa-2x"></i>
@@ -29,7 +28,6 @@
                         </ul>
                     </div>
                     
-                    <!-- Área de autenticação -->
                     <div id="authButtons" class="ms-3">
                         <button class="btn btn-primary" id="loginBtn">Login</button>
                     </div>
@@ -38,12 +36,11 @@
         </nav>
     </header>
 
-    <!-- Conteúdo Principal -->
     <main class="main-content" id="mainContent">
         <div class="content-wrapper" id="contentArea">
             <div class="text-center py-5">
-                <i class="fas fa-lock fa-4x text-secondary mb-4"></i>
-                <h3>Sistema Protegido</h3>
+                <i class="fas fa-shield-alt fa-4x text-primary mb-4"></i>
+                <h3>Sistema Seguro</h3>
                 <p class="text-muted">Faça login para acessar o sistema</p>
             </div>
         </div>
@@ -54,14 +51,14 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Acesso ao Sistema</h5>
+                    <h5 class="modal-title">Login Seguro</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="loginForm">
                         <div class="mb-3">
-                            <label for="username" class="form-label">Usuário (Login)</label>
-                            <input type="text" class="form-control" id="username" required placeholder="Ex: thiago.barbosa">
+                            <label for="username" class="form-label">Usuário</label>
+                            <input type="text" class="form-control" id="username" required placeholder="Digite seu login">
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Senha</label>
@@ -74,9 +71,7 @@
                             </div>
                             <p class="mt-2">Verificando credenciais...</p>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100" id="submitLoginBtn">
-                            Entrar
-                        </button>
+                        <button type="submit" class="btn btn-primary w-100">Entrar</button>
                     </form>
                 </div>
             </div>
@@ -85,128 +80,148 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="0_firebase_api_config.js"></script>
-    <script type="module" src="scripts_telas/0_funcoes_compartilhadas.js"></script>
     <script type="module">
         import { 
             db, 
             auth, 
             signInWithEmailAndPassword, 
             signOut,
+            onAuthStateChanged,
             doc, 
             getDoc,
-            onAuthStateChanged
+            query,
+            collection,
+            where,
+            getDocs
         } from './0_firebase_api_config.js';
         import { 
             carregarTela, 
             carregarMenu,
             mostrarNotificacao,
             aplicarBackground,
-            verificarSessaoLocal,
-            salvarSessaoLocal,
-            limparSessaoLocal
+            getCurrentUser
         } from './scripts_telas/0_funcoes_compartilhadas.js';
 
         let loginModalInstance = null;
+        let currentUserData = null;
 
-        // Verificar sessão local ao iniciar
-        async function inicializarSistema() {
-            // Tenta recuperar sessão do localStorage
-            const sessaoLocal = verificarSessaoLocal();
-            
-            if (sessaoLocal) {
-                // Sessão local existe - usar dados para navegação rápida
-                console.log('Usando sessão local para:', sessaoLocal.login);
+        // Monitorar estado de autenticação (FONTE ÚNICA DA VERDADE)
+        onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // Usuário autenticado no Firebase - buscar dados atualizados
+                console.log('✅ Usuário autenticado:', firebaseUser.email);
                 
-                // Atualizar interface com dados da sessão
-                document.getElementById('authButtons').innerHTML = `
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user me-1"></i>${sessaoLocal.nome.split(' ')[0]}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" id="logoutBtn">
-                                <i class="fas fa-sign-out-alt me-2"></i>Sair
-                            </a></li>
-                        </ul>
-                    </div>
-                `;
-                
-                document.getElementById('logoutBtn').addEventListener('click', async () => {
+                try {
+                    // Buscar dados do Firestore usando o email
+                    const loginsRef = collection(db, 'logins');
+                    const q = query(loginsRef, where('email', '==', firebaseUser.email));
+                    const querySnapshot = await getDocs(q);
+                    
+                    if (!querySnapshot.empty) {
+                        querySnapshot.forEach((doc) => {
+                            currentUserData = {
+                                uid: firebaseUser.uid,
+                                login: doc.id,
+                                nome: doc.data().nome,
+                                cargo: doc.data().cargo,
+                                perfil: doc.data().perfil,
+                                email: doc.data().email,
+                                status_ativo: doc.data().status_ativo
+                            };
+                        });
+                        
+                        // Verificar se está ativo
+                        if (!currentUserData.status_ativo) {
+                            await signOut(auth);
+                            mostrarNotificacao('Usuário inativo. Contate o administrador.', 'error');
+                            return;
+                        }
+                        
+                        // Atualizar interface
+                        document.getElementById('authButtons').innerHTML = `
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-user-shield me-1"></i>${currentUserData.nome.split(' ')[0]}
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Sair
+                                    </a></li>
+                                </ul>
+                            </div>
+                        `;
+                        
+                        document.getElementById('logoutBtn').addEventListener('click', async () => {
+                            await signOut(auth);
+                            currentUserData = null;
+                            mostrarNotificacao('Logout realizado com sucesso!', 'info');
+                        });
+                        
+                        // Carregar menu e tela inicial
+                        carregarMenu(currentUserData.cargo, currentUserData);
+                        await carregarTela('home', currentUserData);
+                        
+                    } else {
+                        // Usuário autenticado mas sem dados no Firestore
+                        console.error('Usuário sem permissões');
+                        await signOut(auth);
+                        mostrarNotificacao('Usuário não autorizado no sistema.', 'error');
+                    }
+                    
+                } catch (error) {
+                    console.error('Erro ao buscar dados:', error);
                     await signOut(auth);
-                    limparSessaoLocal();
-                    window.location.reload();
-                    mostrarNotificacao('Logout realizado com sucesso!', 'info');
-                });
-                
-                // Carregar menu e tela inicial (sem consultar auth novamente)
-                carregarMenu(sessaoLocal.cargo, sessaoLocal);
-                await carregarTela('home', sessaoLocal);
-                
-                // Opcional: verificar auth em background (não bloqueia navegação)
-                verificarAuthBackground(sessaoLocal);
+                    mostrarNotificacao('Erro ao carregar dados do usuário.', 'error');
+                }
                 
             } else {
-                // Sem sessão - mostrar tela de login
-                document.getElementById('authButtons').innerHTML = '<button class="btn btn-primary" id="loginBtn">Login</button>';
-                document.getElementById('loginBtn').addEventListener('click', () => {
-                    loginModalInstance = new bootstrap.Modal(document.getElementById('loginModal'));
-                    loginModalInstance.show();
-                });
+                // Usuário não autenticado
+                currentUserData = null;
                 
-                document.getElementById('navMenu').innerHTML = '<li><a class="dropdown-item disabled" href="#"><i class="fas fa-lock me-2"></i>Faça login para acessar o menu</a></li>';
+                // Limpar qualquer dado sensível
+                sessionStorage.clear();
                 
-                document.getElementById('contentArea').innerHTML = `
-                    <div class="text-center py-5">
-                        <i class="fas fa-lock fa-4x text-secondary mb-4"></i>
-                        <h3 class="mb-3">Sistema Protegido</h3>
-                        <p class="text-muted mb-4">Por favor, faça login para acessar todas as funcionalidades</p>
-                        <button class="btn btn-primary btn-lg" onclick="document.getElementById('loginBtn').click()">
-                            <i class="fas fa-sign-in-alt me-2"></i>Realizar Login
-                        </button>
-                    </div>
-                `;
+                // Mostrar tela de login
+                document.getElementById('authButtons').innerHTML = '<button class="btn btn-primary" id="loginBtn"><i class="fas fa-sign-in-alt me-2"></i>Login</button>';
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) {
+                    loginBtn.removeEventListener('click', abrirModalLogin);
+                    loginBtn.addEventListener('click', abrirModalLogin);
+                }
+                
+                // Limpar menu
+                const navMenu = document.getElementById('navMenu');
+                if (navMenu) {
+                    navMenu.innerHTML = '<li><a class="dropdown-item disabled" href="#"><i class="fas fa-lock me-2"></i>Faça login</a></li>';
+                }
+                
+                // Tela de boas-vindas
+                const contentArea = document.getElementById('contentArea');
+                if (contentArea) {
+                    contentArea.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-shield-alt fa-4x text-primary mb-4"></i>
+                            <h3 class="mb-3">Sistema Seguro</h3>
+                            <p class="text-muted mb-4">Autenticação via Firebase</p>
+                            <button class="btn btn-primary btn-lg" id="telaLoginBtn">
+                                <i class="fas fa-sign-in-alt me-2"></i>Fazer Login
+                            </button>
+                        </div>
+                    `;
+                    
+                    document.getElementById('telaLoginBtn')?.addEventListener('click', abrirModalLogin);
+                }
                 
                 aplicarBackground('home', 'cliente');
             }
-        }
+        });
         
-        // Verificar autenticação em background (não interfere na navegação)
-        async function verificarAuthBackground(sessao) {
-            try {
-                // Verificar se o token do Firebase ainda é válido
-                if (auth.currentUser) {
-                    // Token ainda válido
-                    console.log('Token Firebase válido');
-                } else {
-                    // Token expirado - tentar renovar ou atualizar sessão
-                    console.log('Token expirado, renovando...');
-                    
-                    // Buscar dados atualizados do Firestore
-                    const userDoc = await getDoc(doc(db, 'logins', sessao.login));
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        if (userData.status_ativo) {
-                            // Atualizar sessão local
-                            salvarSessaoLocal({
-                                login: sessao.login,
-                                nome: userData.nome,
-                                cargo: userData.cargo,
-                                perfil: userData.perfil,
-                                email: userData.email,
-                                ultima_verificacao: new Date().toISOString()
-                            });
-                            console.log('Sessão atualizada em background');
-                        } else {
-                            // Usuário inativo - fazer logout
-                            limparSessaoLocal();
-                            mostrarNotificacao('Sessão expirada. Faça login novamente.', 'warning');
-                            window.location.reload();
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Erro na verificação em background:', error);
-            }
+        function abrirModalLogin() {
+            const modalElement = document.getElementById('loginModal');
+            loginModalInstance = new bootstrap.Modal(modalElement);
+            document.getElementById('loginForm').reset();
+            document.getElementById('loginError').classList.add('d-none');
+            loginModalInstance.show();
         }
 
         // Processar login
@@ -217,14 +232,14 @@
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('loginError');
             const loginLoading = document.getElementById('loginLoading');
-            const submitBtn = document.getElementById('submitLoginBtn');
+            const submitBtn = document.querySelector('#loginForm button[type="submit"]');
 
             errorDiv.classList.add('d-none');
             loginLoading.classList.remove('d-none');
             submitBtn.disabled = true;
 
             try {
-                // 1. Buscar o email do usuário no Firestore pelo login
+                // 1. Buscar email no Firestore
                 const userDoc = await getDoc(doc(db, 'logins', username));
                 
                 if (!userDoc.exists()) {
@@ -233,66 +248,52 @@
 
                 const userData = userDoc.data();
                 
-                // 2. Verificar se está ativo
+                // 2. Verificar status
                 if (!userData.status_ativo) {
                     throw new Error('Usuário inativo');
                 }
                 
-                // 3. Verificar se tem email
+                // 3. Verificar email
                 if (!userData.email) {
-                    throw new Error('Email não configurado para este usuário');
+                    throw new Error('Email não configurado');
                 }
                 
-                // 4. Autenticar no Firebase Auth
+                // 4. Autenticar no Firebase Auth (ÚNICA VALIDAÇÃO DE SENHA)
                 await signInWithEmailAndPassword(auth, userData.email, password);
                 
-                // 5. Salvar sessão LOCAL (para navegação rápida)
-                salvarSessaoLocal({
-                    login: username,
-                    nome: userData.nome,
-                    cargo: userData.cargo,
-                    perfil: userData.perfil,
-                    email: userData.email,
-                    data_login: new Date().toISOString(),
-                    ultima_verificacao: new Date().toISOString()
-                });
-                
-                // 6. Fechar modal e mostrar sucesso
+                // 5. Fechar modal
                 loginModalInstance.hide();
-                document.getElementById('loginForm').reset();
                 mostrarNotificacao(`Bem-vindo(a) ${userData.nome}!`, 'success');
                 
-                // 7. Recarregar a página para usar sessão local
-                window.location.reload();
-                
             } catch (error) {
-                console.error('Erro:', error);
-                errorDiv.textContent = error.message;
+                console.error('Erro no login:', error);
+                
+                let mensagem = error.message;
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+                    mensagem = 'Usuário ou senha incorretos';
+                } else if (error.code === 'auth/too-many-requests') {
+                    mensagem = 'Muitas tentativas. Tente mais tarde';
+                }
+                
+                errorDiv.textContent = mensagem;
                 errorDiv.classList.remove('d-none');
                 loginLoading.classList.add('d-none');
                 submitBtn.disabled = false;
-                
-                setTimeout(() => {
-                    errorDiv.classList.add('d-none');
-                }, 3000);
             }
         });
         
-        // Monitorar mudanças no auth (apenas para logout externo)
-        onAuthStateChanged(auth, async (firebaseUser) => {
-            if (!firebaseUser) {
-                // Usuário foi deslogado externamente
-                const sessao = verificarSessaoLocal();
-                if (sessao) {
-                    limparSessaoLocal();
-                    mostrarNotificacao('Sessão encerrada. Faça login novamente.', 'warning');
-                    window.location.reload();
-                }
-            }
-        });
+        // Proteção contra XSS - Sanitização
+        function sanitizarHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
         
-        // Inicializar sistema
-        inicializarSistema();
+        // Configurar CSP (Content Security Policy) no meta tag
+        const meta = document.createElement('meta');
+        meta.httpEquiv = 'Content-Security-Policy';
+        meta.content = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com 'unsafe-inline'; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';";
+        document.head.appendChild(meta);
     </script>
 </body>
 </html>
