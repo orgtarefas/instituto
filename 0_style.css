@@ -160,6 +160,9 @@ header .dropdown-toggle::after {
     padding-top: 0 !important;
     padding-bottom: 20px !important;
     margin-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
 }
 
 /* Remove padding dos rows e cols */
@@ -173,7 +176,7 @@ header .dropdown-toggle::after {
     padding-right: 0 !important;
 }
 
-/* ==================== CARROSSEL - IMAGEM ORIGINAL ==================== */
+/* ==================== CARROSSEL - LARGURA TOTAL COM BORDAS ==================== */
 .carousel {
     margin-top: 0 !important;
     padding-top: 0 !important;
@@ -186,24 +189,38 @@ header .dropdown-toggle::after {
 }
 
 .carousel-inner {
-    border-radius: 0 !important;
-    background: transparent;
+    border-radius: 20px !important;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin: 0 20px;
 }
 
-/* Imagem do carrossel - mantém formato original */
+/* Imagem do carrossel - ocupando toda largura */
 .carousel-img {
     width: 100%;
     height: auto;
-    max-height: 500px;
-    object-fit: contain;
     display: block;
     background: transparent;
 }
 
+/* Para desktop */
+@media (min-width: 769px) {
+    .carousel-img {
+        max-height: 500px;
+        object-fit: cover;
+    }
+}
+
 /* Para mobile */
 @media (max-width: 768px) {
+    .carousel-inner {
+        border-radius: 15px !important;
+        margin: 0 10px;
+    }
+    
     .carousel-img {
         max-height: 300px;
+        object-fit: cover;
     }
 }
 
@@ -227,6 +244,14 @@ header .dropdown-toggle::after {
 .carousel-control-next {
     width: 5%;
     opacity: 0.8;
+    background: transparent;
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+    background-color: rgba(0,0,0,0.5);
+    border-radius: 50%;
+    padding: 20px;
 }
 
 /* Cards e componentes */
@@ -265,7 +290,7 @@ header .dropdown-toggle::after {
     }
 }
 
-/* Responsividade */
+/* Responsividade para serviços */
 @media (max-width: 768px) {
     .logo-img-center {
         height: 50px;
@@ -283,6 +308,11 @@ header .dropdown-toggle::after {
     
     .carousel-caption p {
         font-size: 11px;
+    }
+    
+    .carousel-control-prev-icon,
+    .carousel-control-next-icon {
+        padding: 12px;
     }
     
     .content-wrapper {
@@ -493,17 +523,12 @@ header .dropdown-toggle::after {
 
 /* Ajuste do título da seção */
 h2.text-center {
-    margin-top: 20px;
-    margin-bottom: 20px;
+    margin-top: 30px;
+    margin-bottom: 30px;
 }
 
-/* Primeira seção - sem margem superior */
+/* Primeira seção - sem margem superior excessiva */
 .row.mb-5:first-child {
     margin-top: 0 !important;
     padding-top: 0 !important;
-}
-
-.row.mb-5 {
-    margin-top: 0;
-    padding-top: 0;
 }
