@@ -1,74 +1,159 @@
-import { auth } from '../0_firebase_api_config.js';
+import { auth, db, doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where, orderBy, updateDoc } from '../0_firebase_api_config.js';
 
-let userDataCache = null;
+// ==================== FUNÇÕES DE AUTENTICAÇÃO ====================
 
-// Função segura para obter usuário atual (sempre verifica no Firebase)
-export async function getCurrentUser() {
+// Verificar se está autenticado
+export async function isAuthenticated() {
     return new Promise((resolve) => {
-        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
             unsubscribe();
-            if (user) {
-                resolve(user);
-            } else {
-                resolve(null);
-            }
+            resolve(!!user);
         });
     });
 }
 
-// Verificar se o usuário está autenticado (FORÇA VERIFICAÇÃO NO FIREBASE)
-export async function isAuthenticated() {
-    const user = await getCurrentUser();
-    return user !== null;
+// Obter usuário atual
+export async function getCurrentUser() {
+    return new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
 }
 
-// Obter token ID do Firebase (para validações no backend)
-export async function getIdToken() {
-    const user = await getCurrentUser();
-    if (user) {
-        return await user.getIdToken();
+// Verificar permissão para gerenciar imagens
+export async function verificarPermissaoAdmin(userData) {
+    if (!userData) return false;
+    
+    // Desenvolvedor (admin) tem acesso total
+    if (userData.cargo === 'Desenvolvedor' && userData.perfil === 'admin') {
+        return true;
     }
-    return null;
+    
+    // Funcionário com perfil supervisor ou gerente
+    if (userData.cargo === 'Funcionário' && (userData.perfil === 'supervisor' || userData.perfil === 'gerente')) {
+        return true;
+    }
+    
+    return false;
 }
 
-// Verificar permissão específica (sempre verifica no Firebase)
-export async function verificarPermissao(permissaoNecessaria) {
+// Buscar chave da API do ImgBB
+export async function getImgBBKey() {
     try {
-        const user = await getCurrentUser();
-        if (!user) return false;
-        
-        // Buscar dados atualizados do Firestore
-        const { db, doc, getDoc, query, collection, where, getDocs } = await import('../0_firebase_api_config.js');
-        
-        const loginsRef = collection(db, 'logins');
-        const q = query(loginsRef, where('email', '==', user.email));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-            let userData = null;
-            querySnapshot.forEach((doc) => {
-                userData = doc.data();
+        const configDoc = await getDoc(doc(db, 'config', 'api'));
+        if (configDoc.exists()) {
+            return configDoc.data().imgbb_key;
+        }
+        throw new Error('Chave da API ImgBB não configurada no Firebase');
+    } catch (error) {
+        console.error('Erro ao buscar chave ImgBB:', error);
+        throw error;
+    }
+}
+
+// Upload de imagem para ImgBB
+export async function uploadImageToImgBB(file, onProgress) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Buscar a chave da API
+            const apiKey = await getImgBBKey();
+            
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable && onProgress) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    onProgress(percent);
+                }
             });
             
-            // Verificar permissão baseada no perfil/cargo
-            switch(permissaoNecessaria) {
-                case 'admin':
-                    return userData.perfil === 'admin';
-                case 'funcionario':
-                    return userData.cargo !== 'Cliente';
-                case 'cliente':
-                    return userData.cargo === 'Cliente';
-                default:
-                    return true;
-            }
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            resolve(response.data.url);
+                        } else {
+                            reject(new Error('Erro no upload para ImgBB'));
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                } else {
+                    reject(new Error(`Erro HTTP: ${xhr.status}`));
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                reject(new Error('Erro de conexão com ImgBB'));
+            });
+            
+            xhr.open('POST', `https://api.imgbb.com/1/upload?key=${apiKey}`);
+            xhr.send(formData);
+            
+        } catch (error) {
+            reject(error);
         }
-        
-        return false;
+    });
+}
+
+// Salvar imagem do carrossel no Firestore
+export async function salvarImagemCarrossel(dados) {
+    try {
+        const docRef = await addDoc(collection(db, 'carrossel_novidades'), {
+            titulo: dados.titulo,
+            descricao: dados.descricao,
+            imagem_url: dados.imagem_url,
+            tipo: dados.tipo,
+            ordem: dados.ordem || Date.now(),
+            ativo: true,
+            criado_em: new Date().toISOString(),
+            criado_por: dados.criado_por
+        });
+        return docRef.id;
     } catch (error) {
-        console.error('Erro ao verificar permissão:', error);
-        return false;
+        console.error('Erro ao salvar imagem:', error);
+        throw error;
     }
 }
+
+// Buscar imagens do carrossel de novidades
+export async function buscarImagensNovidades() {
+    try {
+        const q = query(
+            collection(db, 'carrossel_novidades'), 
+            where('ativo', '==', true), 
+            orderBy('ordem')
+        );
+        const querySnapshot = await getDocs(q);
+        const imagens = [];
+        querySnapshot.forEach((doc) => {
+            imagens.push({ id: doc.id, ...doc.data() });
+        });
+        return imagens;
+    } catch (error) {
+        console.error('Erro ao buscar imagens:', error);
+        return [];
+    }
+}
+
+// Excluir imagem do carrossel
+export async function excluirImagemCarrossel(id) {
+    try {
+        await deleteDoc(doc(db, 'carrossel_novidades', id));
+        return true;
+    } catch (error) {
+        console.error('Erro ao excluir imagem:', error);
+        throw error;
+    }
+}
+
+// ==================== FUNÇÕES DE BACKGROUND ====================
 
 // Aplicar background
 export function aplicarBackground(telaId, perfil) {
@@ -128,7 +213,7 @@ export function aplicarBackground(telaId, perfil) {
         
         const contentWrapper = document.querySelector('.content-wrapper');
         if (contentWrapper) {
-            contentWrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            contentWrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
             contentWrapper.style.borderRadius = '10px';
             contentWrapper.style.margin = '20px';
             contentWrapper.style.padding = '20px';
@@ -137,7 +222,9 @@ export function aplicarBackground(telaId, perfil) {
     }
 }
 
-// Carregar menu
+// ==================== FUNÇÕES DE MENU ====================
+
+// Carregar menu baseado no cargo
 export function carregarMenu(cargo, userData) {
     let menuItems = [];
     const isCliente = (cargo === 'Cliente' || cargo === 'cliente');
@@ -173,15 +260,6 @@ export function carregarMenu(cargo, userData) {
             link.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const telaId = link.getAttribute('data-tela');
-                
-                // Verificar autenticação antes de carregar tela
-                const autenticado = await isAuthenticated();
-                if (!autenticado) {
-                    mostrarNotificacao('Sessão expirada. Faça login novamente.', 'error');
-                    window.location.reload();
-                    return;
-                }
-                
                 await carregarTela(telaId, userData);
                 
                 if (window.innerWidth < 768) {
@@ -195,18 +273,12 @@ export function carregarMenu(cargo, userData) {
     }
 }
 
+// ==================== FUNÇÕES DE TELA ====================
+
 // Carregar tela
 export async function carregarTela(telaId, userData) {
     const contentArea = document.getElementById('contentArea');
     if (!contentArea) return;
-    
-    // Verificar autenticação novamente por segurança
-    const autenticado = await isAuthenticated();
-    if (!autenticado && telaId !== 'home') {
-        mostrarNotificacao('Sessão expirada', 'error');
-        window.location.reload();
-        return;
-    }
     
     contentArea.innerHTML = `
         <div class="text-center py-5">
@@ -266,15 +338,17 @@ export async function carregarTela(telaId, userData) {
     }
 }
 
+// ==================== FUNÇÕES GERAIS ====================
+
 // Mostrar notificação
 export function mostrarNotificacao(mensagem, tipo = 'success') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${tipo} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
     alertDiv.style.zIndex = '9999';
     alertDiv.style.minWidth = '300px';
-    alertDiv.style.zIndex = '10000';
+    alertDiv.style.animation = 'slideIn 0.3s ease';
     alertDiv.innerHTML = `
-        <i class="fas ${tipo === 'success' ? 'fa-check-circle' : tipo === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} me-2"></i>
+        <i class="fas ${tipo === 'success' ? 'fa-check-circle' : tipo === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle'} me-2"></i>
         ${mensagem}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
@@ -290,4 +364,9 @@ export function formatarData(data) {
     if (!data) return 'Data não informada';
     const date = new Date(data);
     return date.toLocaleDateString('pt-BR');
+}
+
+// Verificar se é mobile
+export function isMobile() {
+    return window.innerWidth <= 768;
 }
