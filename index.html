@@ -15,58 +15,56 @@
     <header class="bg-white shadow-sm sticky-top">
         <nav class="container-fluid">
             <div class="row align-items-center py-2">
-                <div class="col-6 col-md-3">
+                <div class="col-6">
                     <img src="imagens/logo.png" alt="Logo" class="logo-img" id="logo">
                 </div>
-                <div class="col-6 col-md-9 d-flex justify-content-end align-items-center gap-3">
+                <div class="col-6 d-flex justify-content-end align-items-center">
+                    <!-- Menu de 3 pontinhos -->
                     <div class="dropdown">
-                        <button class="btn btn-outline-secondary d-md-none" type="button" id="menuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-bars"></i>
+                        <button class="btn btn-link text-dark p-0" type="button" id="menuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-2x"></i>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end" id="navMenu" aria-labelledby="menuButton">
-                            <!-- Menu dinâmico -->
+                        <ul class="dropdown-menu dropdown-menu-end" id="navMenu">
+                            <li><a class="dropdown-item" href="#">Faça login primeiro</a></li>
                         </ul>
                     </div>
-                    <div id="authButtons">
+                    
+                    <!-- Área de autenticação -->
+                    <div id="authButtons" class="ms-3">
                         <button class="btn btn-primary" id="loginBtn">Login</button>
                     </div>
-                </div>
-            </div>
-            <!-- Menu desktop -->
-            <div class="row d-none d-md-block">
-                <div class="col-12">
-                    <ul class="nav nav-tabs" id="desktopMenu">
-                        <!-- Menu desktop dinâmico -->
-                    </ul>
                 </div>
             </div>
         </nav>
     </header>
 
     <!-- Conteúdo Principal -->
-    <main class="container-fluid mt-3">
-        <div id="contentArea">
-            <!-- O conteúdo de cada tela será carregado aqui -->
+    <main class="main-content" id="mainContent">
+        <div class="content-wrapper" id="contentArea">
+            <div class="text-center py-5">
+                <i class="fas fa-spinner fa-pulse fa-3x text-primary mb-3"></i>
+                <h3>Carregando sistema...</h3>
+            </div>
         </div>
     </main>
 
     <!-- Modal de Login -->
     <div class="modal fade" id="loginModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Login</h5>
+                    <h5 class="modal-title">Acesso ao Sistema</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="loginForm">
                         <div class="mb-3">
-                            <label for="username" class="form-label">Usuário (Login)</label>
-                            <input type="text" class="form-control" id="username" required>
+                            <label for="username" class="form-label">Usuário</label>
+                            <input type="text" class="form-control" id="username" required autocomplete="username">
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Senha</label>
-                            <input type="password" class="form-control" id="password" required>
+                            <input type="password" class="form-control" id="password" required autocomplete="current-password">
                         </div>
                         <div id="loginError" class="alert alert-danger d-none"></div>
                         <button type="submit" class="btn btn-primary w-100">Entrar</button>
@@ -80,93 +78,83 @@
     <script type="module" src="0_firebase_api_config.js"></script>
     <script type="module" src="scripts_telas/0_funcoes_compartilhadas.js"></script>
     <script type="module">
-        import { auth, db, signInWithEmailAndPassword, doc, getDoc } from './0_firebase_api_config.js';
-        import { carregarTela, verificarSessao, logout } from './scripts_telas/0_funcoes_compartilhadas.js';
+        import { db, doc, getDoc } from './0_firebase_api_config.js';
+        import { 
+            carregarTela, 
+            verificarSessao, 
+            logout, 
+            carregarMenu,
+            mostrarNotificacao,
+            aplicarBackground
+        } from './scripts_telas/0_funcoes_compartilhadas.js';
 
         let currentUser = null;
         let loginModalInstance = null;
 
+        // Função principal de verificação de acesso
         window.verificarAcesso = async function() {
             currentUser = await verificarSessao();
+            
             if (currentUser) {
+                // Usuário logado
                 document.getElementById('authButtons').innerHTML = `
                     <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            ${currentUser.nome || currentUser.login}
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i>${currentUser.nome.split(' ')[0]}
                         </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" id="logoutBtn">Sair</a></li>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt me-2"></i>Sair
+                            </a></li>
                         </ul>
                     </div>
                 `;
-                document.getElementById('logoutBtn').addEventListener('click', () => {
-                    logout();
-                    location.reload();
+                
+                document.getElementById('logoutBtn').addEventListener('click', async () => {
+                    await logout();
+                    window.verificarAcesso();
+                    mostrarNotificacao('Logout realizado com sucesso!', 'info');
                 });
+                
+                // Carregar menu e tela inicial
                 carregarMenu(currentUser.cargo);
                 await carregarTela('home', currentUser);
             } else {
-                document.getElementById('authButtons').innerHTML = '<button class="btn btn-primary" id="loginBtn">Login</button>';
+                // Usuário não logado
+                document.getElementById('authButtons').innerHTML = '<button class="btn btn-primary" id="loginBtn"><i class="fas fa-sign-in-alt me-2"></i>Login</button>';
                 document.getElementById('loginBtn').addEventListener('click', abrirModalLogin);
-                document.getElementById('navMenu').innerHTML = '';
-                document.getElementById('desktopMenu').innerHTML = '';
+                
+                // Limpar menu e mostrar conteúdo padrão
+                const navMenu = document.getElementById('navMenu');
+                if (navMenu) {
+                    navMenu.innerHTML = '<li><a class="dropdown-item disabled" href="#">Faça login para acessar o menu</a></li>';
+                }
+                
+                const contentArea = document.getElementById('contentArea');
+                if (contentArea) {
+                    contentArea.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-lock fa-3x text-secondary mb-3"></i>
+                            <h3>Sistema Protegido</h3>
+                            <p>Por favor, faça login para acessar todas as funcionalidades</p>
+                            <button class="btn btn-primary" onclick="document.getElementById('loginBtn').click()">
+                                <i class="fas fa-sign-in-alt me-2"></i>Realizar Login
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                aplicarBackground('home', 'cliente');
             }
         };
 
-        function carregarMenu(cargo) {
-            let menuItems = [];
-            if (cargo === 'Cliente' || cargo === 'cliente') {
-                menuItems = [
-                    { id: 'home', nome: 'Home', icon: 'fa-home' },
-                    { id: 'clientes_agendamentos', nome: 'Meus Agendamentos', icon: 'fa-calendar' },
-                    { id: 'clientes_palestras', nome: 'Palestras Online', icon: 'fa-video' },
-                    { id: 'clientes_cursos', nome: 'Cursos', icon: 'fa-graduation-cap' }
-                ];
-            } else {
-                menuItems = [
-                    { id: 'home', nome: 'Home', icon: 'fa-home' },
-                    { id: 'funcionarios_agendamentos', nome: 'Agendamentos', icon: 'fa-calendar-check' },
-                    { id: 'funcionarios_palestras', nome: 'Gestão de Palestras', icon: 'fa-chalkboard-user' },
-                    { id: 'funcionarios_cursos', nome: 'Gestão de Cursos', icon: 'fa-book-open' },
-                    { id: 'funcionarios_cadastros', nome: 'Gestão de Cadastros', icon: 'fa-users-gear' }
-                ];
-            }
-
-            // Menu mobile
-            const navMenu = document.getElementById('navMenu');
-            navMenu.innerHTML = menuItems.map(item => `
-                <li><a class="dropdown-item" href="#" data-tela="${item.id}">
-                    <i class="fas ${item.icon} me-2"></i>${item.nome}
-                </a></li>
-            `).join('');
-
-            // Menu desktop
-            const desktopMenu = document.getElementById('desktopMenu');
-            desktopMenu.innerHTML = menuItems.map(item => `
-                <li class="nav-item">
-                    <a class="nav-link" href="#" data-tela="${item.id}">
-                        <i class="fas ${item.icon} me-2"></i>${item.nome}
-                    </a>
-                </li>
-            `).join('');
-
-            document.querySelectorAll('[data-tela]').forEach(link => {
-                link.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    const telaId = link.getAttribute('data-tela');
-                    await carregarTela(telaId, currentUser);
-                    // Atualizar classe ativa
-                    document.querySelectorAll('.nav-link').forEach(nav => nav.classList.remove('active'));
-                    link.classList.add('active');
-                });
-            });
-        }
-
+        // Abrir modal de login
         function abrirModalLogin() {
             loginModalInstance = new bootstrap.Modal(document.getElementById('loginModal'));
             loginModalInstance.show();
         }
 
+        // Processar login
         document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
@@ -183,12 +171,14 @@
 
                 const userData = userDoc.data();
                 
+                // Verificar senha
                 if (userData.senha !== password) {
                     throw new Error('Senha incorreta');
                 }
 
+                // Verificar status
                 if (!userData.status_ativo) {
-                    throw new Error('Usuário inativo');
+                    throw new Error('Usuário inativo. Contate o administrador.');
                 }
 
                 // Salvar sessão
@@ -199,18 +189,27 @@
                     perfil: userData.perfil,
                     email: userData.email
                 };
+                
                 localStorage.setItem('userSession', JSON.stringify(sessionData));
                 
                 loginModalInstance.hide();
+                document.getElementById('loginForm').reset();
+                mostrarNotificacao(`Bem-vindo(a) ${userData.nome}!`, 'success');
+                
+                // Recarregar a interface
                 await window.verificarAcesso();
                 
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.classList.remove('d-none');
+                
+                setTimeout(() => {
+                    errorDiv.classList.add('d-none');
+                }, 3000);
             }
         });
 
-        // Inicializar
+        // Inicializar sistema
         window.verificarAcesso();
     </script>
 </body>
